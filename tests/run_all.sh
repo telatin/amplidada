@@ -5,6 +5,7 @@ set -euo pipefail
 INPUT_DIR="${1:-data/small/filter_and_trim/}"
 OUT_DIR="${2:-data/small/results/}"
 DADA2_BIN="${DADA2_BIN:-bin/dada2}"
+REMOVE_BIMERA_BIN="${REMOVE_BIMERA_BIN:-bin/removeBimerDenovo}"
 
 # Recommended settings for filtered reads (from your sweep)
 THREADS="${THREADS:-4}"
@@ -26,6 +27,19 @@ ASV_MIN_TOTAL="${ASV_MIN_TOTAL:-10}"
 ASV_MIN_LEN="${ASV_MIN_LEN:-}"
 ASV_MAX_LEN="${ASV_MAX_LEN:-}"
 ASV_LEN_MODE_WINDOW="${ASV_LEN_MODE_WINDOW:-2}"
+
+# Chimera removal (removeBimerDenovo) over long-table rows.
+REMOVE_BIMERA="${REMOVE_BIMERA:-1}"
+BIMERA_METHOD="${BIMERA_METHOD:-consensus}" # pooled|consensus|per-sample
+BIMERA_THREADS="${BIMERA_THREADS:-$THREADS}"
+BIMERA_PARALLEL_MIN_CANDIDATES="${BIMERA_PARALLEL_MIN_CANDIDATES:-128}"
+BIMERA_ALLOW_ONE_OFF="${BIMERA_ALLOW_ONE_OFF:-0}" # 1=yes, 0=no
+BIMERA_MIN_ONE_OFF_PARENT_DISTANCE="${BIMERA_MIN_ONE_OFF_PARENT_DISTANCE:-4}"
+BIMERA_MIN_SAMPLE_FRACTION="${BIMERA_MIN_SAMPLE_FRACTION:-0.9}"
+BIMERA_IGNORE_N_NEGATIVES="${BIMERA_IGNORE_N_NEGATIVES:-1}"
+# If set (non-empty), override removeBimerDenovo defaults:
+BIMERA_MIN_FOLD_PARENT_OVER_ABUNDANCE="${BIMERA_MIN_FOLD_PARENT_OVER_ABUNDANCE:-}"
+BIMERA_MIN_PARENT_ABUNDANCE="${BIMERA_MIN_PARENT_ABUNDANCE:-}"
 
 # If 1, skip samples that already have outputs
 RESUME="${RESUME:-1}"
@@ -105,6 +119,8 @@ echo "Done. success=$ok failed=$fail"
 
 # -------- Build long + wide ASV tables --------
 raw_long_tsv="$OUT_DIR/asv_long.raw.tsv"
+chimera_long_tsv="$OUT_DIR/asv_long.nobim.tsv"
+chimera_summary="$OUT_DIR/removeBimerDenovo.summary.txt"
 long_tsv="$OUT_DIR/asv_long.tsv"
 seq_list="$OUT_DIR/asv_sequences.txt"
 seqtab="$OUT_DIR/seqtab.tsv"
@@ -112,6 +128,7 @@ asv_fasta="$OUT_DIR/asv.fasta"
 counts_tsv="$OUT_DIR/counts.tsv"
 asv_map="$OUT_DIR/asv_map.tsv"
 sample_list="$OUT_DIR/sample_list.txt"
+pipeline_summary="$OUT_DIR/asv_pipeline.summary.txt"
 
 echo -e "SampleID\tSequence\tAbundance" > "$raw_long_tsv"
 for f in "$OUT_DIR"/merged/*.merged.tsv; do
@@ -119,6 +136,37 @@ for f in "$OUT_DIR"/merged/*.merged.tsv; do
   sample="$(basename "$f" .merged.tsv)"
   awk -F'\t' -v s="$sample" 'NR>1{print s"\t"$2"\t"$3}' "$f" >> "$raw_long_tsv"
 done
+
+long_source="$raw_long_tsv"
+if [[ "$REMOVE_BIMERA" == "1" ]]; then
+  [[ -x "$REMOVE_BIMERA_BIN" ]] || { echo "ERROR: cannot execute $REMOVE_BIMERA_BIN"; exit 1; }
+  bim_cmd=(
+    "$REMOVE_BIMERA_BIN"
+    --input "$raw_long_tsv"
+    --input-format long
+    --output "$chimera_long_tsv"
+    --summary "$chimera_summary"
+    --method "$BIMERA_METHOD"
+    --threads "$BIMERA_THREADS"
+    --parallel-min-candidates "$BIMERA_PARALLEL_MIN_CANDIDATES"
+    --min-sample-fraction "$BIMERA_MIN_SAMPLE_FRACTION"
+    --ignore-n-negatives "$BIMERA_IGNORE_N_NEGATIVES"
+    --quiet
+  )
+  if [[ "$BIMERA_ALLOW_ONE_OFF" == "1" ]]; then
+    bim_cmd+=(--allow-one-off --min-one-off-parent-distance "$BIMERA_MIN_ONE_OFF_PARENT_DISTANCE")
+  fi
+  if [[ -n "$BIMERA_MIN_FOLD_PARENT_OVER_ABUNDANCE" ]]; then
+    bim_cmd+=(--min-fold-parent-over-abundance "$BIMERA_MIN_FOLD_PARENT_OVER_ABUNDANCE")
+  fi
+  if [[ -n "$BIMERA_MIN_PARENT_ABUNDANCE" ]]; then
+    bim_cmd+=(--min-parent-abundance "$BIMERA_MIN_PARENT_ABUNDANCE")
+  fi
+
+  echo "Running chimera removal: method=$BIMERA_METHOD allow_one_off=$BIMERA_ALLOW_ONE_OFF"
+  "${bim_cmd[@]}"
+  long_source="$chimera_long_tsv"
+fi
 
 if [[ -z "$ASV_MIN_LEN" || -z "$ASV_MAX_LEN" ]]; then
   mode_len="$(awk -F'\t' '
@@ -137,7 +185,7 @@ if [[ -z "$ASV_MIN_LEN" || -z "$ASV_MAX_LEN" ]]; then
       }
       print mode
     }
-  ' "$raw_long_tsv")"
+  ' "$long_source")"
 
   if [[ "$mode_len" =~ ^[0-9]+$ && "$mode_len" -gt 0 ]]; then
     if [[ -z "$ASV_MIN_LEN" ]]; then
@@ -191,37 +239,47 @@ awk -F'\t' -v OFS='\t' \
       print row[i]
     }
   }
-' "$raw_long_tsv" > "$long_tsv"
+' "$long_source" > "$long_tsv"
 
 ls "$OUT_DIR"/merged/*.merged.tsv 2>/dev/null | xargs -n1 basename | sed 's/\.merged\.tsv$//' | sort > "$sample_list"
 
 awk -F'\t' 'NR>1{print $2}' "$long_tsv" | sort -u > "$seq_list"
 
-{
+awk -F'\t' '
+BEGIN { OFS="\t" }
+FILENAME == ARGV[1] {
+  samples[++nSample] = $0
+  next
+}
+FILENAME == ARGV[2] {
+  seqs[++nSeq] = $0
+  next
+}
+FILENAME == ARGV[3] {
+  if (FNR == 1) next
+  sample = $1
+  seq = $2
+  abundance = $3 + 0
+  counts[sample SUBSEP seq] += abundance
+  next
+}
+END {
   printf "SampleID"
-  while IFS= read -r seq; do
-    printf "\t%s" "$seq"
-  done < "$seq_list"
+  for (i = 1; i <= nSeq; i++) printf OFS seqs[i]
   printf "\n"
-} > "$seqtab"
 
-for f in "$OUT_DIR"/merged/*.merged.tsv; do
-  [[ -f "$f" ]] || continue
-  sample="$(basename "$f" .merged.tsv)"
-  declare -A counts=()
-  while IFS=$'\t' read -r _id seq abundance; do
-    [[ "$seq" == "sequence" ]] && continue
-    counts["$seq"]="$abundance"
-  done < "$f"
-
-  {
-    printf "%s" "$sample"
-    while IFS= read -r seq; do
-      printf "\t%s" "${counts[$seq]:-0}"
-    done < "$seq_list"
+  for (i = 1; i <= nSample; i++) {
+    sample = samples[i]
+    printf "%s", sample
+    for (j = 1; j <= nSeq; j++) {
+      key = sample SUBSEP seqs[j]
+      if (key in counts) printf OFS counts[key]
+      else printf OFS "0"
+    }
     printf "\n"
-  } >> "$seqtab"
-done
+  }
+}
+' "$sample_list" "$seq_list" "$long_tsv" > "$seqtab"
 
 # -------- Build ASV FASTA + transposed counts table --------
 # Map each unique sequence to asv1..asvN sorted by descending total abundance.
@@ -273,13 +331,40 @@ END {
 
 rm -f "$sample_list"
 
+raw_rows="$(awk 'END{print NR-1}' "$raw_long_tsv")"
+raw_unique="$(awk -F'\t' 'NR>1{u[$2]=1} END{print length(u)}' "$raw_long_tsv")"
+source_rows="$(awk 'END{print NR-1}' "$long_source")"
+source_unique="$(awk -F'\t' 'NR>1{u[$2]=1} END{print length(u)}' "$long_source")"
+final_rows="$(awk 'END{print NR-1}' "$long_tsv")"
+final_unique="$(awk -F'\t' 'NR>1{u[$2]=1} END{print length(u)}' "$long_tsv")"
+
+{
+  echo "remove_bimera_enabled=$REMOVE_BIMERA"
+  echo "remove_bimera_method=$BIMERA_METHOD"
+  echo "remove_bimera_allow_one_off=$BIMERA_ALLOW_ONE_OFF"
+  echo "raw_rows=$raw_rows"
+  echo "raw_unique_sequences=$raw_unique"
+  echo "post_bimera_rows=$source_rows"
+  echo "post_bimera_unique_sequences=$source_unique"
+  echo "final_rows=$final_rows"
+  echo "final_unique_sequences=$final_unique"
+  echo "asv_filter_min_total=$ASV_MIN_TOTAL"
+  echo "asv_filter_min_len=$ASV_MIN_LEN"
+  echo "asv_filter_max_len=$ASV_MAX_LEN"
+} > "$pipeline_summary"
+
 echo "ASV outputs:"
 echo "  per-sample merged: $OUT_DIR/merged/"
 echo "  per-sample summary: $OUT_DIR/summary/"
 echo "  long table (raw): $raw_long_tsv"
+if [[ "$REMOVE_BIMERA" == "1" ]]; then
+  echo "  long table (chimera-removed): $chimera_long_tsv"
+  echo "  chimera summary: $chimera_summary"
+fi
 echo "  long table: $long_tsv"
 echo "  ASV filters: min_total=$ASV_MIN_TOTAL min_len=$ASV_MIN_LEN max_len=$ASV_MAX_LEN (auto-window=$ASV_LEN_MODE_WINDOW)"
 echo "  ASV FASTA: $asv_fasta"
 echo "  ASV map: $asv_map"
 echo "  transposed counts: $counts_tsv"
 echo "  sequence table: $seqtab"
+echo "  pipeline summary: $pipeline_summary"
