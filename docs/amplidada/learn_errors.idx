@@ -1,0 +1,27 @@
+nimTitle	learn_errors	amplidada/learn_errors.html	module amplidada/learn_errors		0
+nim	DnaBases	amplidada/learn_errors.html#DnaBases	const DnaBases		5
+nim	LearnErrorsOptions	amplidada/learn_errors.html#LearnErrorsOptions	object LearnErrorsOptions		8
+nim	LearnErrorsSelfConsistOptions	amplidada/learn_errors.html#LearnErrorsSelfConsistOptions	object LearnErrorsSelfConsistOptions		14
+nim	LearnErrorsResult	amplidada/learn_errors.html#LearnErrorsResult	object LearnErrorsResult		21
+nim	LearnErrorsSelfConsistResult	amplidada/learn_errors.html#LearnErrorsSelfConsistResult	object LearnErrorsSelfConsistResult		30
+nim	LearnErrorsBatchResult	amplidada/learn_errors.html#LearnErrorsBatchResult	object LearnErrorsBatchResult		38
+nim	defaultLearnErrorsOptions	amplidada/learn_errors.html#defaultLearnErrorsOptions	proc defaultLearnErrorsOptions(): LearnErrorsOptions		63
+nim	defaultLearnErrorsSelfConsistOptions	amplidada/learn_errors.html#defaultLearnErrorsSelfConsistOptions	proc defaultLearnErrorsSelfConsistOptions(): LearnErrorsSelfConsistOptions		71
+nim	validateOptions	amplidada/learn_errors.html#validateOptions,LearnErrorsOptions	proc validateOptions(opts: LearnErrorsOptions)		80
+nim	validateOptions	amplidada/learn_errors.html#validateOptions,LearnErrorsSelfConsistOptions	proc validateOptions(opts: LearnErrorsSelfConsistOptions)		90
+nim	describe	amplidada/learn_errors.html#describe,LearnErrorsOptions	proc describe(opts: LearnErrorsOptions): string		102
+nim	describe	amplidada/learn_errors.html#describe,LearnErrorsSelfConsistOptions	proc describe(opts: LearnErrorsSelfConsistOptions): string		107
+nim	baseIndex	amplidada/learn_errors.html#baseIndex,char	proc baseIndex(c: char): int		112
+nim	transitionIndex	amplidada/learn_errors.html#transitionIndex,char,char	proc transitionIndex(fromBase, toBase: char): int		120
+nim	getCount	amplidada/learn_errors.html#getCount,LearnErrorsResult,char,char,int	proc getCount(res: LearnErrorsResult; fromBase, toBase: char; q: int): int64		135
+nim	getProb	amplidada/learn_errors.html#getProb,LearnErrorsResult,char,char,int	proc getProb(res: LearnErrorsResult; fromBase, toBase: char; q: int): float64		143
+nim	derepBaseCount	amplidada/learn_errors.html#derepBaseCount,DerepFastqResult	proc derepBaseCount(derepRes: DerepFastqResult): int64		151
+nim	writeLearnErrorsTsv	amplidada/learn_errors.html#writeLearnErrorsTsv,string,LearnErrorsResult	proc writeLearnErrorsTsv(path: string; res: LearnErrorsResult)		155
+nim	writeLearnErrorsCountsTsv	amplidada/learn_errors.html#writeLearnErrorsCountsTsv,string,LearnErrorsResult	proc writeLearnErrorsCountsTsv(path: string; res: LearnErrorsResult)		173
+nim	readLearnErrorsTsv	amplidada/learn_errors.html#readLearnErrorsTsv,string	proc readLearnErrorsTsv(path: string): LearnErrorsResult		189
+nim	learnErrorsFromDereps	amplidada/learn_errors.html#learnErrorsFromDereps,openArray[DerepFastqResult],LearnErrorsOptions	proc learnErrorsFromDereps(derepResults: openArray[DerepFastqResult];\n                      opts: LearnErrorsOptions = defaultLearnErrorsOptions()): LearnErrorsResult		462
+nim	learnErrorsFromDerep	amplidada/learn_errors.html#learnErrorsFromDerep,DerepFastqResult,LearnErrorsOptions	proc learnErrorsFromDerep(derepRes: DerepFastqResult;\n                     opts: LearnErrorsOptions = defaultLearnErrorsOptions()): LearnErrorsResult		471
+nim	learnErrorsSelfConsistentFromDereps	amplidada/learn_errors.html#learnErrorsSelfConsistentFromDereps,openArray[DerepFastqResult],LearnErrorsOptions,LearnErrorsSelfConsistOptions	proc learnErrorsSelfConsistentFromDereps(derepResults: openArray[DerepFastqResult];\n    learnOpts: LearnErrorsOptions = defaultLearnErrorsOptions(); scOpts: LearnErrorsSelfConsistOptions = defaultLearnErrorsSelfConsistOptions()): LearnErrorsSelfConsistResult		477
+nim	learnErrorsFromFastqPaths	amplidada/learn_errors.html#learnErrorsFromFastqPaths,openArray[string],DerepFastqOptions,LearnErrorsOptions,int64,LearnErrorsSelfConsistOptions	proc learnErrorsFromFastqPaths(inputPaths: openArray[string]; derepOpts: DerepFastqOptions = defaultDerepFastqOptions();\n    learnOpts: LearnErrorsOptions = defaultLearnErrorsOptions();\n                          nbases: int64 = 100000000; selfConsistOpts: LearnErrorsSelfConsistOptions = defaultLearnErrorsSelfConsistOptions()): LearnErrorsBatchResult		528
+nimgrp	validateoptions	amplidada/learn_errors.html#validateOptions-procs-all	proc		80
+nimgrp	describe	amplidada/learn_errors.html#describe-procs-all	proc		102

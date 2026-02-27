@@ -1,0 +1,11 @@
+nimTitle	derep	amplidada/derep.html	module amplidada/derep		0
+nim	dsoAbundance	amplidada/derep.html#dsoAbundance	DerepOrder.dsoAbundance		6
+nim	dsoFirstSeen	amplidada/derep.html#dsoFirstSeen	DerepOrder.dsoFirstSeen		6
+nim	DerepOrder	amplidada/derep.html#DerepOrder	enum DerepOrder		6
+nim	DerepFastqOptions	amplidada/derep.html#DerepFastqOptions	object DerepFastqOptions		10
+nim	DerepUnique	amplidada/derep.html#DerepUnique	object DerepUnique		17
+nim	DerepFastqResult	amplidada/derep.html#DerepFastqResult	object DerepFastqResult		23
+nim	defaultDerepFastqOptions	amplidada/derep.html#defaultDerepFastqOptions	proc defaultDerepFastqOptions(): DerepFastqOptions		45
+nim	validateOptions	amplidada/derep.html#validateOptions,DerepFastqOptions	proc validateOptions(opts: DerepFastqOptions)		54
+nim	describe	amplidada/derep.html#describe,DerepFastqOptions	proc describe(opts: DerepFastqOptions): string		62
+nim	derepFastq	amplidada/derep.html#derepFastq,string,DerepFastqOptions	proc derepFastq(inputPath: string;\n           opts: DerepFastqOptions = defaultDerepFastqOptions()): DerepFastqResult		194

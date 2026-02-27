@@ -1,0 +1,11 @@
+nimTitle	types	amplidada/types.html	module amplidada/types		0
+nim	rlSingleEnd	amplidada/types.html#rlSingleEnd	ReadLayout.rlSingleEnd		2
+nim	rlPairedEnd	amplidada/types.html#rlPairedEnd	ReadLayout.rlPairedEnd		2
+nim	ReadLayout	amplidada/types.html#ReadLayout	enum ReadLayout		2
+nim	psFilter	amplidada/types.html#psFilter	PipelineStep.psFilter		6
+nim	psDereplicate	amplidada/types.html#psDereplicate	PipelineStep.psDereplicate		6
+nim	psDenoise	amplidada/types.html#psDenoise	PipelineStep.psDenoise		6
+nim	psMergePairs	amplidada/types.html#psMergePairs	PipelineStep.psMergePairs		6
+nim	psChimeraRemoval	amplidada/types.html#psChimeraRemoval	PipelineStep.psChimeraRemoval		6
+nim	psSequenceTable	amplidada/types.html#psSequenceTable	PipelineStep.psSequenceTable		6
+nim	PipelineStep	amplidada/types.html#PipelineStep	enum PipelineStep		6

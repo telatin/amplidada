@@ -1,0 +1,33 @@
+nimTitle	remove_bimera_denovo	amplidada/remove_bimera_denovo.html	module amplidada/remove_bimera_denovo		0
+nim	bcNone	amplidada/remove_bimera_denovo.html#bcNone	BimeraCall.bcNone		5
+nim	bcExact	amplidada/remove_bimera_denovo.html#bcExact	BimeraCall.bcExact		5
+nim	bcOneOffMismatch	amplidada/remove_bimera_denovo.html#bcOneOffMismatch	BimeraCall.bcOneOffMismatch		5
+nim	bcOneOffIndel	amplidada/remove_bimera_denovo.html#bcOneOffIndel	BimeraCall.bcOneOffIndel		5
+nim	BimeraCall	amplidada/remove_bimera_denovo.html#BimeraCall	enum BimeraCall		5
+nim	bmPooled	amplidada/remove_bimera_denovo.html#bmPooled	BimeraMethod.bmPooled		11
+nim	bmConsensus	amplidada/remove_bimera_denovo.html#bmConsensus	BimeraMethod.bmConsensus		11
+nim	bmPerSample	amplidada/remove_bimera_denovo.html#bmPerSample	BimeraMethod.bmPerSample		11
+nim	BimeraMethod	amplidada/remove_bimera_denovo.html#BimeraMethod	enum BimeraMethod		11
+nim	BimeraOptions	amplidada/remove_bimera_denovo.html#BimeraOptions	object BimeraOptions		16
+nim	BimeraConsensusOptions	amplidada/remove_bimera_denovo.html#BimeraConsensusOptions	object BimeraConsensusOptions		24
+nim	UniqueSequenceAbundance	amplidada/remove_bimera_denovo.html#UniqueSequenceAbundance	object UniqueSequenceAbundance		28
+nim	SampleSequenceAbundance	amplidada/remove_bimera_denovo.html#SampleSequenceAbundance	object SampleSequenceAbundance		32
+nim	BimeraDenovoResult	amplidada/remove_bimera_denovo.html#BimeraDenovoResult	object BimeraDenovoResult		37
+nim	BimeraTableResult	amplidada/remove_bimera_denovo.html#BimeraTableResult	object BimeraTableResult		47
+nim	RemoveBimeraResult	amplidada/remove_bimera_denovo.html#RemoveBimeraResult	object RemoveBimeraResult		58
+nim	defaultBimeraOptions	amplidada/remove_bimera_denovo.html#defaultBimeraOptions	proc defaultBimeraOptions(): BimeraOptions		87
+nim	defaultBimeraConsensusOptions	amplidada/remove_bimera_denovo.html#defaultBimeraConsensusOptions	proc defaultBimeraConsensusOptions(): BimeraConsensusOptions		97
+nim	validateOptions	amplidada/remove_bimera_denovo.html#validateOptions,BimeraOptions	proc validateOptions(opts: BimeraOptions)		103
+nim	validateOptions	amplidada/remove_bimera_denovo.html#validateOptions,BimeraConsensusOptions	proc validateOptions(opts: BimeraConsensusOptions)		115
+nim	describe	amplidada/remove_bimera_denovo.html#describe,BimeraOptions	proc describe(opts: BimeraOptions): string		121
+nim	describe	amplidada/remove_bimera_denovo.html#describe,BimeraConsensusOptions	proc describe(opts: BimeraConsensusOptions): string		128
+nim	isBimera	amplidada/remove_bimera_denovo.html#isBimera,string,openArray[string],int	proc isBimera(sequence: string; parents: openArray[string]; allowOneOff = false;\n         minOneOffParentDistance = 4): bool		451
+nim	isBimeraDenovo	amplidada/remove_bimera_denovo.html#isBimeraDenovo,openArray[UniqueSequenceAbundance],BimeraOptions	proc isBimeraDenovo(uniques: openArray[UniqueSequenceAbundance];\n               opts: BimeraOptions = defaultBimeraOptions()): BimeraDenovoResult		501
+nim	isBimeraDenovoTable	amplidada/remove_bimera_denovo.html#isBimeraDenovoTable,openArray[SampleSequenceAbundance],BimeraOptions,BimeraConsensusOptions	proc isBimeraDenovoTable(rows: openArray[SampleSequenceAbundance];\n                    bimeraOpts: BimeraOptions = defaultBimeraOptions();\n    consensusOpts: BimeraConsensusOptions = defaultBimeraConsensusOptions()): BimeraTableResult		609
+nim	removeBimeraDenovo	amplidada/remove_bimera_denovo.html#removeBimeraDenovo,openArray[UniqueSequenceAbundance],BimeraOptions	proc removeBimeraDenovo(uniques: openArray[UniqueSequenceAbundance];\n                   opts: BimeraOptions = defaultBimeraOptions()): seq[\n    UniqueSequenceAbundance]		682
+nim	removeBimeraDenovo	amplidada/remove_bimera_denovo.html#removeBimeraDenovo,openArray[SampleSequenceAbundance],BimeraMethod,BimeraOptions,BimeraConsensusOptions	proc removeBimeraDenovo(rows: openArray[SampleSequenceAbundance];\n                   mode: BimeraMethod = bmConsensus;\n                   bimeraOpts: BimeraOptions = defaultBimeraOptions();\n    consensusOpts: BimeraConsensusOptions = defaultBimeraConsensusOptions()): RemoveBimeraResult		692
+nim	writeSampleSequenceAbundanceTsv	amplidada/remove_bimera_denovo.html#writeSampleSequenceAbundanceTsv,string,openArray[SampleSequenceAbundance]	proc writeSampleSequenceAbundanceTsv(path: string;\n                                rows: openArray[SampleSequenceAbundance])		788
+nim	writeUniqueSequenceAbundanceTsv	amplidada/remove_bimera_denovo.html#writeUniqueSequenceAbundanceTsv,string,openArray[UniqueSequenceAbundance]	proc writeUniqueSequenceAbundanceTsv(path: string;\n                                rows: openArray[UniqueSequenceAbundance])		802
+nimgrp	validateoptions	amplidada/remove_bimera_denovo.html#validateOptions-procs-all	proc		103
+nimgrp	removebimeradenovo	amplidada/remove_bimera_denovo.html#removeBimeraDenovo-procs-all	proc		682
+nimgrp	describe	amplidada/remove_bimera_denovo.html#describe-procs-all	proc		121

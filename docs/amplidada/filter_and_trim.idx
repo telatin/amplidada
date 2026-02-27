@@ -1,0 +1,23 @@
+nimTitle	filter_and_trim	amplidada/filter_and_trim.html	module amplidada/filter_and_trim		0
+nim	PairedSampleInput	amplidada/filter_and_trim.html#PairedSampleInput	object PairedSampleInput		6
+nim	PairedSampleJob	amplidada/filter_and_trim.html#PairedSampleJob	object PairedSampleJob		11
+nim	SampleSheetOptions	amplidada/filter_and_trim.html#SampleSheetOptions	object SampleSheetOptions		18
+nim	BatchFilterOptions	amplidada/filter_and_trim.html#BatchFilterOptions	object BatchFilterOptions		25
+nim	PairedSampleResult	amplidada/filter_and_trim.html#PairedSampleResult	object PairedSampleResult		31
+nim	BatchPairedFilterResult	amplidada/filter_and_trim.html#BatchPairedFilterResult	object BatchPairedFilterResult		38
+nim	defaultSampleSheetOptions	amplidada/filter_and_trim.html#defaultSampleSheetOptions	proc defaultSampleSheetOptions(): SampleSheetOptions		44
+nim	defaultBatchFilterOptions	amplidada/filter_and_trim.html#defaultBatchFilterOptions	proc defaultBatchFilterOptions(): BatchFilterOptions		53
+nim	validateOptions	amplidada/filter_and_trim.html#validateOptions,SampleSheetOptions	proc validateOptions(opts: SampleSheetOptions)		61
+nim	validateOptions	amplidada/filter_and_trim.html#validateOptions,BatchFilterOptions	proc validateOptions(opts: BatchFilterOptions)		71
+nim	fastqExt	amplidada/filter_and_trim.html#fastqExt,string	proc fastqExt(path: string): bool		77
+nim	sanitizeSampleId	amplidada/filter_and_trim.html#sanitizeSampleId,string	proc sanitizeSampleId(sampleId: string): string		94
+nim	deriveSampleIdFromForward	amplidada/filter_and_trim.html#deriveSampleIdFromForward,string,string	proc deriveSampleIdFromForward(forwardPath: string; r1Token = "_R1"): string		105
+nim	discoverPairedSamples	amplidada/filter_and_trim.html#discoverPairedSamples,string,string,string	proc discoverPairedSamples(inputDir: string; r1Token = "_R1"; r2Token = "_R2";\n                      recursive = false; requireMate = true): seq[\n    PairedSampleInput]		150
+nim	readPairedSampleSheet	amplidada/filter_and_trim.html#readPairedSampleSheet,string	proc readPairedSampleSheet(sheetPath: string; opts = defaultSampleSheetOptions()): seq[\n    PairedSampleInput]		178
+nim	buildPairedJobs	amplidada/filter_and_trim.html#buildPairedJobs,openArray[PairedSampleInput],string,string,string	proc buildPairedJobs(samples: openArray[PairedSampleInput]; outputDir: string;\n                outForwardSuffix = "_R1.filtered.fastq.gz";\n                outReverseSuffix = "_R2.filtered.fastq.gz"): seq[PairedSampleJob]		253
+nim	filterAndTrimPaired	amplidada/filter_and_trim.html#filterAndTrimPaired,openArray[PairedSampleJob],PairedFastqFilterOptions	proc filterAndTrimPaired(jobs: openArray[PairedSampleJob];\n                    filterOpts: PairedFastqFilterOptions;\n                    batchOpts = defaultBatchFilterOptions()): BatchPairedFilterResult		360
+nim	filterAndTrimPaired	amplidada/filter_and_trim.html#filterAndTrimPaired,openArray[PairedSampleInput],string,PairedFastqFilterOptions,string,string	proc filterAndTrimPaired(samples: openArray[PairedSampleInput]; outputDir: string;\n                    filterOpts: PairedFastqFilterOptions;\n                    batchOpts = defaultBatchFilterOptions();\n                    outForwardSuffix = "_R1.filtered.fastq.gz";\n                    outReverseSuffix = "_R2.filtered.fastq.gz"): BatchPairedFilterResult		408
+nim	filterAndTrimPairedDir	amplidada/filter_and_trim.html#filterAndTrimPairedDir,string,string,PairedFastqFilterOptions,string,string,string,string	proc filterAndTrimPairedDir(inputDir: string; outputDir: string;\n                       filterOpts: PairedFastqFilterOptions;\n                       batchOpts = defaultBatchFilterOptions(); r1Token = "_R1";\n                       r2Token = "_R2"; recursive = false;\n                       outForwardSuffix = "_R1.filtered.fastq.gz";\n                       outReverseSuffix = "_R2.filtered.fastq.gz"): BatchPairedFilterResult		419
+nim	filterAndTrimPairedSheet	amplidada/filter_and_trim.html#filterAndTrimPairedSheet,string,string,PairedFastqFilterOptions,string,string	proc filterAndTrimPairedSheet(sheetPath: string; outputDir: string;\n                         filterOpts: PairedFastqFilterOptions;\n                         sheetOpts = defaultSampleSheetOptions();\n                         batchOpts = defaultBatchFilterOptions();\n                         outForwardSuffix = "_R1.filtered.fastq.gz";\n                         outReverseSuffix = "_R2.filtered.fastq.gz"): BatchPairedFilterResult		433
+nimgrp	validateoptions	amplidada/filter_and_trim.html#validateOptions-procs-all	proc		61
+nimgrp	filterandtrimpaired	amplidada/filter_and_trim.html#filterAndTrimPaired-procs-all	proc		360

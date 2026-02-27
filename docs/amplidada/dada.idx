@@ -1,0 +1,20 @@
+nimTitle	dada	amplidada/dada.html	module amplidada/dada		0
+nim	DadaOptions	amplidada/dada.html#DadaOptions	object DadaOptions		6
+nim	DadaSelfConsistOptions	amplidada/dada.html#DadaSelfConsistOptions	object DadaSelfConsistOptions		19
+nim	AsvRecord	amplidada/dada.html#AsvRecord	object AsvRecord		27
+nim	DadaResult	amplidada/dada.html#DadaResult	object DadaResult		34
+nim	DadaSelfConsistResult	amplidada/dada.html#DadaSelfConsistResult	object DadaSelfConsistResult		47
+nim	defaultDadaOptions	amplidada/dada.html#defaultDadaOptions	proc defaultDadaOptions(): DadaOptions		64
+nim	defaultDadaSelfConsistOptions	amplidada/dada.html#defaultDadaSelfConsistOptions	proc defaultDadaSelfConsistOptions(): DadaSelfConsistOptions		79
+nim	validateOptions	amplidada/dada.html#validateOptions,DadaOptions	proc validateOptions(opts: DadaOptions)		89
+nim	validateOptions	amplidada/dada.html#validateOptions,DadaSelfConsistOptions	proc validateOptions(opts: DadaSelfConsistOptions)		111
+nim	describe	amplidada/dada.html#describe,DadaOptions	proc describe(opts: DadaOptions): string		121
+nim	describe	amplidada/dada.html#describe,DadaSelfConsistOptions	proc describe(opts: DadaSelfConsistOptions): string		128
+nim	abundancePValue	amplidada/dada.html#abundancePValue,int64,float64	proc abundancePValue(reads: int64; expected: float64; prior = false): float64		170
+nim	writeAsvTsv	amplidada/dada.html#writeAsvTsv,string,DadaResult	proc writeAsvTsv(path: string; res: DadaResult)		411
+nim	estimateErrorMatrixFromDada	amplidada/dada.html#estimateErrorMatrixFromDada,DerepFastqResult,DadaResult,LearnErrorsOptions	proc estimateErrorMatrixFromDada(derepRes: DerepFastqResult; dadaRes: DadaResult;\n    learnOpts: LearnErrorsOptions = defaultLearnErrorsOptions()): LearnErrorsResult		449
+nim	dadaDenoise	amplidada/dada.html#dadaDenoise,DerepFastqResult,LearnErrorsResult,DadaOptions	proc dadaDenoise(derepRes: DerepFastqResult; err: LearnErrorsResult;\n            opts: DadaOptions = defaultDadaOptions()): DadaResult		505
+nim	dadaSelfConsistentFromInitialErrors	amplidada/dada.html#dadaSelfConsistentFromInitialErrors,DerepFastqResult,LearnErrorsResult,LearnErrorsOptions,DadaOptions,DadaSelfConsistOptions	proc dadaSelfConsistentFromInitialErrors(derepRes: DerepFastqResult;\n                                    initialErr: LearnErrorsResult; learnOpts: LearnErrorsOptions = defaultLearnErrorsOptions();\n    dadaOpts: DadaOptions = defaultDadaOptions(); scOpts: DadaSelfConsistOptions = defaultDadaSelfConsistOptions()): DadaSelfConsistResult		694
+nim	dadaSelfConsistent	amplidada/dada.html#dadaSelfConsistent,DerepFastqResult,LearnErrorsOptions,DadaOptions,DadaSelfConsistOptions	proc dadaSelfConsistent(derepRes: DerepFastqResult;\n                   learnOpts: LearnErrorsOptions = defaultLearnErrorsOptions();\n                   dadaOpts: DadaOptions = defaultDadaOptions(); scOpts: DadaSelfConsistOptions = defaultDadaSelfConsistOptions()): DadaSelfConsistResult		750
+nimgrp	validateoptions	amplidada/dada.html#validateOptions-procs-all	proc		89
+nimgrp	describe	amplidada/dada.html#describe-procs-all	proc		121

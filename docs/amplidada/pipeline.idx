@@ -1,0 +1,4 @@
+nimTitle	pipeline	amplidada/pipeline.html	module amplidada/pipeline		0
+nim	PipelineOptions	amplidada/pipeline.html#PipelineOptions	object PipelineOptions		5
+nim	defaultPipelineOptions	amplidada/pipeline.html#defaultPipelineOptions	proc defaultPipelineOptions(layout = rlSingleEnd): PipelineOptions		9
+nim	pipelineSummary	amplidada/pipeline.html#pipelineSummary,PipelineOptions	proc pipelineSummary(opts: PipelineOptions): string		12

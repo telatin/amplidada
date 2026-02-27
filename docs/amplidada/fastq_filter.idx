@@ -1,0 +1,32 @@
+nimTitle	fastq_filter	amplidada/fastq_filter.html	module amplidada/fastq_filter		0
+nim	frrNone	amplidada/fastq_filter.html#frrNone	FilterRejectReason.frrNone		20
+nim	frrTooLong	amplidada/fastq_filter.html#frrTooLong	FilterRejectReason.frrTooLong		20
+nim	frrTrimmedEmpty	amplidada/fastq_filter.html#frrTrimmedEmpty	FilterRejectReason.frrTrimmedEmpty		20
+nim	frrTruncLen	amplidada/fastq_filter.html#frrTruncLen	FilterRejectReason.frrTruncLen		20
+nim	frrTooShort	amplidada/fastq_filter.html#frrTooShort	FilterRejectReason.frrTooShort		20
+nim	frrTooManyN	amplidada/fastq_filter.html#frrTooManyN	FilterRejectReason.frrTooManyN		20
+nim	frrLowMinQ	amplidada/fastq_filter.html#frrLowMinQ	FilterRejectReason.frrLowMinQ		20
+nim	frrTooManyExpectedErrors	amplidada/fastq_filter.html#frrTooManyExpectedErrors	FilterRejectReason.frrTooManyExpectedErrors		20
+nim	frrMalformedQuality	amplidada/fastq_filter.html#frrMalformedQuality	FilterRejectReason.frrMalformedQuality		20
+nim	FilterRejectReason	amplidada/fastq_filter.html#FilterRejectReason	enum FilterRejectReason		20
+nim	prrForwardFailed	amplidada/fastq_filter.html#prrForwardFailed	PairRejectReason.prrForwardFailed		31
+nim	prrReverseFailed	amplidada/fastq_filter.html#prrReverseFailed	PairRejectReason.prrReverseFailed		31
+nim	prrBothFailed	amplidada/fastq_filter.html#prrBothFailed	PairRejectReason.prrBothFailed		31
+nim	PairRejectReason	amplidada/fastq_filter.html#PairRejectReason	enum PairRejectReason		31
+nim	FastqFilterOptions	amplidada/fastq_filter.html#FastqFilterOptions	object FastqFilterOptions		36
+nim	PairedFastqFilterOptions	amplidada/fastq_filter.html#PairedFastqFilterOptions	object PairedFastqFilterOptions		50
+nim	FastqFilterStats	amplidada/fastq_filter.html#FastqFilterStats	object FastqFilterStats		55
+nim	FastqPairedFilterStats	amplidada/fastq_filter.html#FastqPairedFilterStats	object FastqPairedFilterStats		61
+nim	defaultFastqFilterOptions	amplidada/fastq_filter.html#defaultFastqFilterOptions	proc defaultFastqFilterOptions(): FastqFilterOptions		94
+nim	defaultPairedFastqFilterOptions	amplidada/fastq_filter.html#defaultPairedFastqFilterOptions	proc defaultPairedFastqFilterOptions(): PairedFastqFilterOptions		110
+nim	validateOptions	amplidada/fastq_filter.html#validateOptions,FastqFilterOptions	proc validateOptions(opts: FastqFilterOptions)		115
+nim	validateOptions	amplidada/fastq_filter.html#validateOptions,PairedFastqFilterOptions	proc validateOptions(opts: PairedFastqFilterOptions)		141
+nim	describe	amplidada/fastq_filter.html#describe,FastqFilterOptions	proc describe(opts: FastqFilterOptions): string		145
+nim	describe	amplidada/fastq_filter.html#describe,PairedFastqFilterOptions	proc describe(opts: PairedFastqFilterOptions): string		152
+nim	discardRatio	amplidada/fastq_filter.html#discardRatio,FastqFilterStats	proc discardRatio(stats: FastqFilterStats): float		157
+nim	discardRatio	amplidada/fastq_filter.html#discardRatio,FastqPairedFilterStats	proc discardRatio(stats: FastqPairedFilterStats): float		162
+nim	fastqFilter	amplidada/fastq_filter.html#fastqFilter,string,string,FastqFilterOptions	proc fastqFilter(inputPath, outputPath: string;\n            opts: FastqFilterOptions = defaultFastqFilterOptions()): FastqFilterStats		398
+nim	fastqPairedFilter	amplidada/fastq_filter.html#fastqPairedFilter,string,string,string,string,PairedFastqFilterOptions	proc fastqPairedFilter(inputPath1, inputPath2: string;\n                  outputPath1, outputPath2: string; opts: PairedFastqFilterOptions = defaultPairedFastqFilterOptions()): FastqPairedFilterStats		428
+nimgrp	validateoptions	amplidada/fastq_filter.html#validateOptions-procs-all	proc		115
+nimgrp	discardratio	amplidada/fastq_filter.html#discardRatio-procs-all	proc		157
+nimgrp	describe	amplidada/fastq_filter.html#describe-procs-all	proc		145
