@@ -33,15 +33,18 @@ suite "amplidada smoke tests":
     let derepFastqBin = binDir / "derepFastq"
     let filterAndTrimBin = binDir / "filterAndTrim"
     let dada2Bin = binDir / "dada2"
+    let removeBimerDenovoBin = binDir / "removeBimerDenovo"
 
     compileBinary("src/cli/fastqFilter.nim", fastqFilterBin)
     compileBinary("src/cli/learnErrors.nim", learnErrorsBin)
     compileBinary("src/cli/derepFastq.nim", derepFastqBin)
     compileBinary("src/cli/filterAndTrim.nim", filterAndTrimBin)
     compileBinary("src/cli/dada2.nim", dada2Bin)
+    compileBinary("src/cli/removeBimerDenovo.nim", removeBimerDenovoBin)
 
     runHelp(fastqFilterBin)
     runHelp(learnErrorsBin)
     runHelp(derepFastqBin)
     runHelp(filterAndTrimBin)
     runHelp(dada2Bin)
+    runHelp(removeBimerDenovoBin)

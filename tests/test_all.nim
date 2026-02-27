@@ -5,3 +5,4 @@ include test_learn_errors
 include test_merge_pairs
 include test_fastq_filter
 include test_filter_and_trim
+include test_remove_bimera_denovo

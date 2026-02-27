@@ -11,7 +11,8 @@ bin           = @[
   "cli/derepFastq=derepFastq",
   "cli/fastqFilter=fastqFilter",
   "cli/filterAndTrim=filterAndTrim",
-  "cli/learnErrors=learnErrors"
+  "cli/learnErrors=learnErrors",
+  "cli/removeBimerDenovo=removeBimerDenovo"
 ]
 
 # Dependencies
@@ -31,4 +32,4 @@ task integration, "Run optional slow real-data integration test (set AMPLIDADA_R
   exec "nim c -r --threads:on --nimcache:.nimcache-integration --hints:off --verbosity:0 tests/test_integration_real_data.nim"
 
 task tools, "Build CLI binaries into ./bin":
-  exec "mkdir -p bin && nim c --threads:on -d:release --nimcache:.nimcache-tools --outdir:bin src/cli/dada2.nim && nim c --threads:on -d:release --nimcache:.nimcache-tools --outdir:bin src/cli/derepFastq.nim && nim c --threads:on -d:release --nimcache:.nimcache-tools --outdir:bin src/cli/fastqFilter.nim && nim c --threads:on -d:release --nimcache:.nimcache-tools --outdir:bin src/cli/filterAndTrim.nim && nim c --threads:on -d:release --nimcache:.nimcache-tools --outdir:bin src/cli/learnErrors.nim"
+  exec "mkdir -p bin && nim c --threads:on -d:release --nimcache:.nimcache-tools --outdir:bin src/cli/dada2.nim && nim c --threads:on -d:release --nimcache:.nimcache-tools --outdir:bin src/cli/derepFastq.nim && nim c --threads:on -d:release --nimcache:.nimcache-tools --outdir:bin src/cli/fastqFilter.nim && nim c --threads:on -d:release --nimcache:.nimcache-tools --outdir:bin src/cli/filterAndTrim.nim && nim c --threads:on -d:release --nimcache:.nimcache-tools --outdir:bin src/cli/learnErrors.nim && nim c --threads:on -d:release --nimcache:.nimcache-tools --outdir:bin src/cli/removeBimerDenovo.nim"
