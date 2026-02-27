@@ -1,0 +1,11 @@
+bin/filterAndTrim \
+    --input-dir ./data/reads \
+    --output-dir ./data/filter_trim_NIM2_out/ \
+    --trunc-len 240 \
+    --trunc-len-r 160 \
+    --max-n 0 \
+    --max-ee 2 \
+    --trunc-q 2 \
+    --out-forward-suffix _R1_filt.fastq.gz \
+    --out-reverse-suffix _R2_filt.fastq.gz \
+    --threads 8 --verbose
