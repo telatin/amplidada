@@ -305,42 +305,6 @@ proc collectUniqueObs(derepResults: openArray[DerepFastqResult]): seq[UniqueObs]
       ))
     globalReadOffset += derepRes.totalReads
 
-proc initialCentersByLength(uniqueObs: openArray[UniqueObs]): Table[int, string] =
-  result = initTable[int, string]()
-  var best = initTable[int, CenterCandidate]()
-  for u in uniqueObs:
-    let cand = CenterCandidate(
-      sequence: u.sequence,
-      abundance: u.abundance,
-      firstSeenGlobal: u.firstSeenGlobal
-    )
-    let seqLen = u.sequence.len
-    if seqLen in best:
-      if isBetterCandidate(cand, best[seqLen]):
-        best[seqLen] = cand
-    else:
-      best[seqLen] = cand
-
-  for seqLen, cand in best:
-    result[seqLen] = cand.sequence
-
-proc centersToSeq(centers: Table[int, string]): seq[tuple[seqLen: int, center: string]] =
-  for seqLen, center in centers:
-    result.add((seqLen: seqLen, center: center))
-  result.sort(proc(a, b: tuple[seqLen: int, center: string]): int =
-    if a.seqLen != b.seqLen:
-      return cmp(a.seqLen, b.seqLen)
-    cmp(a.center, b.center)
-  )
-
-proc countCenterChanges(oldCenters, newCenters: Table[int, string]): int =
-  for seqLen, center in oldCenters:
-    if seqLen notin newCenters or newCenters[seqLen] != center:
-      inc result
-  for seqLen, _ in newCenters:
-    if seqLen notin oldCenters:
-      inc result
-
 proc buildLengthGroups(uniqueObs: openArray[UniqueObs]): Table[int, seq[int]] =
   result = initTable[int, seq[int]]()
   for i in 0..<uniqueObs.len:
@@ -384,6 +348,68 @@ proc buildCandidatePools(
       candidates.setLen(maxCentersPerLength)
     result[seqLen] = candidates
 
+proc hammingDistance(a, b: string): int =
+  let n = min(a.len, b.len)
+  for i in 0..<n:
+    if a[i] != b[i]: inc result
+  result += abs(a.len - b.len)
+
+proc nearestCenterIndex(s: string, centers: seq[string]): int =
+  var bestDist = high(int)
+  for i, c in centers:
+    let d = hammingDistance(s, c)
+    if d < bestDist:
+      bestDist = d
+      result = i
+      if bestDist == 0: break
+
+proc mostLikelyCenterIndex(
+  u: UniqueObs,
+  centers: seq[string],
+  matrix: LearnErrorsResult
+): int =
+  const minProb = 1e-300
+  var bestScore = -Inf
+  for i, c in centers:
+    var score = 0.0
+    let n = min(u.sequence.len, c.len)
+    for pos in 0..<n:
+      let fromIdx = baseIndex(c[pos])
+      let toIdx = baseIndex(u.sequence[pos])
+      let p =
+        if fromIdx < 0 or toIdx < 0: minProb
+        else:
+          let qIdx = qualityToBinIndex(u.meanQual[pos], matrix.qMin, matrix.qMax)
+          max(minProb, matrix.probs[fromIdx * 4 + toIdx][qIdx])
+      score += ln(p)
+    if score > bestScore:
+      bestScore = score
+      result = i
+
+proc initialMultiCentersByLength(
+  uniqueObs: openArray[UniqueObs],
+  maxCentersPerLength: int
+): Table[int, seq[string]] =
+  result = initTable[int, seq[string]]()
+  let pools = buildCandidatePools(uniqueObs, maxCentersPerLength)
+  for seqLen, candidates in pools:
+    var seqs = newSeq[string](candidates.len)
+    for i, cand in candidates:
+      seqs[i] = cand.sequence
+    result[seqLen] = seqs
+
+proc multiCentersToSeq(
+  centers: Table[int, seq[string]]
+): seq[tuple[seqLen: int, center: string]] =
+  for seqLen, seqList in centers:
+    for c in seqList:
+      result.add((seqLen: seqLen, center: c))
+  result.sort(proc(a, b: tuple[seqLen: int, center: string]): int =
+    if a.seqLen != b.seqLen:
+      return cmp(a.seqLen, b.seqLen)
+    cmp(a.center, b.center)
+  )
+
 proc accumulateFromCenters(
   uniqueObs: openArray[UniqueObs],
   centersByLength: Table[int, string],
@@ -405,6 +431,73 @@ proc accumulateFromCenters(
         result.skippedPositions += u.abundance
         continue
 
+      let qIdx = qualityToBinIndex(u.meanQual[pos], result.qMin, result.qMax)
+      result.counts[fromIdx * 4 + toIdx][qIdx] += u.abundance
+      result.totalTransitions += u.abundance
+
+  fillProbabilities(result, opts)
+
+proc accumulateFromMultiCenters(
+  uniqueObs: openArray[UniqueObs],
+  centersByLength: Table[int, seq[string]],
+  opts: LearnErrorsOptions
+): LearnErrorsResult =
+  result = initResult(opts.qMin, opts.qMax)
+  var totalCenters = 0
+  for _, cs in centersByLength:
+    totalCenters += cs.len
+  result.centerCountByLength = totalCenters
+
+  for u in uniqueObs:
+    let seqLen = u.sequence.len
+    if seqLen notin centersByLength:
+      continue
+    let centers = centersByLength[seqLen]
+    if centers.len == 0:
+      continue
+    let cIdx = nearestCenterIndex(u.sequence, centers)
+    let centerSeq = centers[cIdx]
+
+    for pos in 0..<seqLen:
+      let fromIdx = baseIndex(centerSeq[pos])
+      let toIdx = baseIndex(u.sequence[pos])
+      if fromIdx < 0 or toIdx < 0:
+        result.skippedPositions += u.abundance
+        continue
+      let qIdx = qualityToBinIndex(u.meanQual[pos], result.qMin, result.qMax)
+      result.counts[fromIdx * 4 + toIdx][qIdx] += u.abundance
+      result.totalTransitions += u.abundance
+
+  fillProbabilities(result, opts)
+
+proc accumulateFromMultiCentersLikelihood(
+  uniqueObs: openArray[UniqueObs],
+  centersByLength: Table[int, seq[string]],
+  matrix: LearnErrorsResult,
+  opts: LearnErrorsOptions
+): LearnErrorsResult =
+  result = initResult(opts.qMin, opts.qMax)
+  var totalCenters = 0
+  for _, cs in centersByLength:
+    totalCenters += cs.len
+  result.centerCountByLength = totalCenters
+
+  for u in uniqueObs:
+    let seqLen = u.sequence.len
+    if seqLen notin centersByLength:
+      continue
+    let centers = centersByLength[seqLen]
+    if centers.len == 0:
+      continue
+    let cIdx = mostLikelyCenterIndex(u, centers, matrix)
+    let centerSeq = centers[cIdx]
+
+    for pos in 0..<seqLen:
+      let fromIdx = baseIndex(centerSeq[pos])
+      let toIdx = baseIndex(u.sequence[pos])
+      if fromIdx < 0 or toIdx < 0:
+        result.skippedPositions += u.abundance
+        continue
       let qIdx = qualityToBinIndex(u.meanQual[pos], result.qMin, result.qMax)
       result.counts[fromIdx * 4 + toIdx][qIdx] += u.abundance
       result.totalTransitions += u.abundance
@@ -465,8 +558,8 @@ proc learnErrorsFromDereps*(
 ): LearnErrorsResult =
   validateOptions(opts)
   let uniqueObs = collectUniqueObs(derepResults)
-  let centersByLength = initialCentersByLength(uniqueObs)
-  accumulateFromCenters(uniqueObs, centersByLength, opts)
+  let multiCenters = initialMultiCentersByLength(uniqueObs, 64)
+  accumulateFromMultiCenters(uniqueObs, multiCenters, opts)
 
 proc learnErrorsFromDerep*(
   derepRes: DerepFastqResult,
@@ -483,26 +576,30 @@ proc learnErrorsSelfConsistentFromDereps*(
   validateOptions(scOpts)
 
   let uniqueObs = collectUniqueObs(derepResults)
-  var centers = initialCentersByLength(uniqueObs)
-  let lengthGroups = buildLengthGroups(uniqueObs)
+  # Use top-K centers per length group; nearest-neighbor Hamming assignment
+  # correctly attributes reads to their most likely biological sequence,
+  # preventing biological diversity from inflating error rates.
+  let multiCenters = initialMultiCentersByLength(uniqueObs, scOpts.maxCentersPerLength)
 
   if not scOpts.enabled:
-    result.matrix = accumulateFromCenters(uniqueObs, centers, learnOpts)
+    result.matrix = accumulateFromMultiCenters(uniqueObs, multiCenters, learnOpts)
     result.iterationsRun = (if uniqueObs.len == 0: 0 else: 1)
     result.converged = true
     result.maxAbsProbDelta = 0.0
-    result.centersByLength = centersToSeq(centers)
+    result.centersByLength = multiCentersToSeq(multiCenters)
     return
 
-  let candidatePools = buildCandidatePools(uniqueObs, scOpts.maxCentersPerLength)
+  # Self-consistency: iteration 1 uses Hamming assignment for a good initial
+  # model; subsequent iterations refine via likelihood-based assignment.
   var previousMatrix = initResult(learnOpts.qMin, learnOpts.qMax)
   var havePrevious = false
 
   for iter in 1..scOpts.maxIterations:
-    let currentMatrix = accumulateFromCenters(uniqueObs, centers, learnOpts)
-    let newCenters = selectCentersByLikelihood(uniqueObs, lengthGroups, candidatePools, currentMatrix)
-    let centerChanges = countCenterChanges(centers, newCenters)
-    result.centerChangesTotal += centerChanges
+    let currentMatrix =
+      if iter == 1:
+        accumulateFromMultiCenters(uniqueObs, multiCenters, learnOpts)
+      else:
+        accumulateFromMultiCentersLikelihood(uniqueObs, multiCenters, previousMatrix, learnOpts)
 
     var delta = 0.0
     if havePrevious:
@@ -512,7 +609,7 @@ proc learnErrorsSelfConsistentFromDereps*(
     result.iterationsRun = iter
     result.maxAbsProbDelta = delta
 
-    if iter >= scOpts.minIterations and centerChanges == 0 and delta <= scOpts.tol:
+    if iter >= scOpts.minIterations and delta <= scOpts.tol:
       result.converged = true
       break
 
@@ -521,9 +618,8 @@ proc learnErrorsSelfConsistentFromDereps*(
 
     previousMatrix = currentMatrix
     havePrevious = true
-    centers = newCenters
 
-  result.centersByLength = centersToSeq(centers)
+  result.centersByLength = multiCentersToSeq(multiCenters)
 
 proc learnErrorsFromFastqPaths*(
   inputPaths: openArray[string],

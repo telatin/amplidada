@@ -1,4 +1,4 @@
-import std/[os, parseopt, sets, strformat, strutils]
+import std/[algorithm, os, parseopt, sets, strformat, strutils]
 import amplidada
 
 proc usage() =
@@ -60,6 +60,19 @@ proc usage() =
   echo "  --merge-threads <int>            Worker threads for mergePairs"
   echo "  --merge-parallel-min-pairs <int> Min unique ASV-pairs for parallel merge"
   echo ""
+  echo "Chimera removal:"
+  echo "  --remove-bimera                  Enable removeBimerDenovo stage on output ASVs"
+  echo "  --bimera-method <pooled|consensus|per-sample>"
+  echo "  --bimera-sample-id <id>          Sample ID used for bimera table modes"
+  echo "  --bimera-min-fold-parent-over-abundance <float>"
+  echo "  --bimera-min-parent-abundance <int>"
+  echo "  --bimera-allow-one-off"
+  echo "  --bimera-min-one-off-parent-distance <int>"
+  echo "  --bimera-min-sample-fraction <float>"
+  echo "  --bimera-ignore-n-negatives <int>"
+  echo "  --bimera-threads <int>"
+  echo "  --bimera-parallel-min-candidates <int>"
+  echo ""
   echo "Outputs and reporting:"
   echo "  --summary <path>                 Write run summary"
   echo "  --verbose                        Print progress details"
@@ -96,7 +109,11 @@ proc normalizeArgs(args: seq[string]): seq[string] =
     "--threads", "--chunk-size", "--parallel-min-chunk", "--order",
     "--omega-a", "--omega-c", "--min-abundance", "--min-hamming", "--min-fold", "--max-clusters",
     "--max-iter", "--max-shuffle", "--parallel-min-groups",
-    "--min-overlap", "--max-mismatch", "--merge-threads", "--merge-parallel-min-pairs"
+    "--min-overlap", "--max-mismatch", "--merge-threads", "--merge-parallel-min-pairs",
+    "--bimera-method", "--bimera-sample-id",
+    "--bimera-min-fold-parent-over-abundance", "--bimera-min-parent-abundance",
+    "--bimera-min-one-off-parent-distance", "--bimera-min-sample-fraction", "--bimera-ignore-n-negatives",
+    "--bimera-threads", "--bimera-parallel-min-candidates"
   ])
 
   var i = 0
@@ -120,6 +137,118 @@ proc makeLearnBatchFromLoadedMatrix(derepRes: DerepFastqResult): LearnErrorsBatc
   result.converged = true
   result.maxAbsProbDelta = 0.0
   result.centerChangesTotal = 0
+
+type
+  ChimeraStageSummary = object
+    enabled: bool
+    mode: BimeraMethod
+    inputUnique: int
+    outputUnique: int
+    removedUnique: int
+    exactCount: int
+    oneOffMismatchCount: int
+    oneOffIndelCount: int
+    bimeraOptions: string
+    consensusOptions: string
+
+proc toUpperDnaLocal(s: string): string =
+  result = newString(s.len)
+  for i, c in s:
+    result[i] =
+      case c
+      of 'a'..'z': chr(ord(c) - 32)
+      else: c
+
+proc defaultSampleIdFromPath(path: string): string =
+  let p = splitFile(path)
+  if p.name.len > 0:
+    return p.name
+  "sample"
+
+proc writeAsvRowsTsv(path: string, asvs: seq[AsvRecord]) =
+  var f: File
+  if not open(f, path, fmWrite):
+    raise newException(IOError, "Unable to open ASV output file: " & path)
+  defer:
+    close(f)
+
+  f.writeLine("asv_id\tsequence\tabundance\tcluster_size\tcenter_unique_index\tfirst_seen_read_index")
+  for i, asv in asvs:
+    f.writeLine(&"ASV{i + 1}\t{asv.sequence}\t{asv.abundance}\t{asv.clusterSize}\t{asv.centerUniqueIndex}\t{asv.firstSeenReadIndex}")
+
+proc writeMergedRowsTsv(path: string, rows: seq[MergedSequence]) =
+  var f: File
+  if not open(f, path, fmWrite):
+    raise newException(IOError, "Unable to open merged output file: " & path)
+  defer:
+    close(f)
+
+  f.writeLine("merged_id\tsequence\tabundance")
+  for i, row in rows:
+    f.writeLine(&"MERGED{i + 1}\t{row.sequence}\t{row.abundance}")
+
+proc filterAsvsByBimera(
+  asvs: seq[AsvRecord],
+  sampleId: string,
+  mode: BimeraMethod,
+  bimeraOpts: BimeraOptions,
+  consensusOpts: BimeraConsensusOptions
+): tuple[asvs: seq[AsvRecord], summary: ChimeraStageSummary] =
+  var rows: seq[SampleSequenceAbundance] = @[]
+  for asv in asvs:
+    rows.add(SampleSequenceAbundance(sampleId: sampleId, sequence: asv.sequence, abundance: asv.abundance))
+
+  let removeRes = removeBimeraDenovo(rows, mode, bimeraOpts, consensusOpts)
+  var keepSet = initHashSet[string]()
+  for row in removeRes.kept:
+    keepSet.incl(toUpperDnaLocal(row.sequence))
+
+  for asv in asvs:
+    if keepSet.contains(toUpperDnaLocal(asv.sequence)):
+      result.asvs.add(asv)
+
+  result.summary.enabled = true
+  result.summary.mode = mode
+  result.summary.inputUnique = removeRes.inputUniqueCount
+  result.summary.outputUnique = removeRes.keptUniqueCount
+  result.summary.removedUnique = removeRes.removedUniqueCount
+  result.summary.exactCount = removeRes.exactBimeraCount
+  result.summary.oneOffMismatchCount = removeRes.oneOffMismatchBimeraCount
+  result.summary.oneOffIndelCount = removeRes.oneOffIndelBimeraCount
+  result.summary.bimeraOptions = bimeraOpts.describe()
+  result.summary.consensusOptions = consensusOpts.describe()
+
+proc filterMergedByBimera(
+  mergedRows: seq[MergedSequence],
+  sampleId: string,
+  mode: BimeraMethod,
+  bimeraOpts: BimeraOptions,
+  consensusOpts: BimeraConsensusOptions
+): tuple[rows: seq[MergedSequence], summary: ChimeraStageSummary] =
+  var rows: seq[SampleSequenceAbundance] = @[]
+  for row in mergedRows:
+    rows.add(SampleSequenceAbundance(sampleId: sampleId, sequence: row.sequence, abundance: row.abundance))
+
+  let removeRes = removeBimeraDenovo(rows, mode, bimeraOpts, consensusOpts)
+  result.rows = newSeq[MergedSequence](removeRes.kept.len)
+  for i, row in removeRes.kept:
+    result.rows[i] = MergedSequence(sequence: row.sequence, abundance: row.abundance)
+  result.rows.sort(proc(a, b: MergedSequence): int =
+    if a.abundance != b.abundance:
+      return cmp(b.abundance, a.abundance)
+    cmp(a.sequence, b.sequence)
+  )
+
+  result.summary.enabled = true
+  result.summary.mode = mode
+  result.summary.inputUnique = removeRes.inputUniqueCount
+  result.summary.outputUnique = removeRes.keptUniqueCount
+  result.summary.removedUnique = removeRes.removedUniqueCount
+  result.summary.exactCount = removeRes.exactBimeraCount
+  result.summary.oneOffMismatchCount = removeRes.oneOffMismatchBimeraCount
+  result.summary.oneOffIndelCount = removeRes.oneOffIndelBimeraCount
+  result.summary.bimeraOptions = bimeraOpts.describe()
+  result.summary.consensusOptions = consensusOpts.describe()
 
 proc learnOrLoadErrorMatrix(
   label: string,
@@ -169,8 +298,10 @@ proc writeSingleSummary(
   dadaScRan: bool,
   dadaScRes: DadaSelfConsistResult,
   dadaRes: DadaResult,
+  outputAsvCount: int,
   dadaOpts: DadaOptions,
-  loadedFromFile: bool
+  loadedFromFile: bool,
+  chimera: ChimeraStageSummary
 ) =
   var f: File
   if not open(f, path, fmWrite):
@@ -193,12 +324,25 @@ proc writeSingleSummary(
   f.writeLine("dada_self_consist_max_abs_prob_delta=" & $dadaScRes.maxAbsProbDelta)
   f.writeLine("dada_self_consist_assignment_changes=" & $dadaScRes.assignmentChanges)
   f.writeLine("err_loaded_from_file=" & $loadedFromFile)
-  f.writeLine("asv_count=" & $dadaRes.asvCount)
+  f.writeLine("asv_count_pre_bimera=" & $dadaRes.asvCount)
+  f.writeLine("asv_count=" & $outputAsvCount)
   f.writeLine("corrected_uniques=" & $dadaRes.correctedUniques)
   f.writeLine("uncorrected_uniques=" & $dadaRes.uncorrectedUniques)
   f.writeLine("denoise_group_count=" & $dadaRes.groupCount)
   f.writeLine("denoise_iterations_total=" & $dadaRes.iterationsRun)
   f.writeLine("denoise_splits_accepted=" & $dadaRes.splitsAccepted)
+  f.writeLine("bimera_enabled=" & $chimera.enabled)
+  if chimera.enabled:
+    f.writeLine("bimera_mode=" & $chimera.mode)
+    f.writeLine("bimera_input_unique_sequences=" & $chimera.inputUnique)
+    f.writeLine("bimera_output_unique_sequences=" & $chimera.outputUnique)
+    f.writeLine("bimera_removed_unique_sequences=" & $chimera.removedUnique)
+    f.writeLine("bimera_exact_count=" & $chimera.exactCount)
+    f.writeLine("bimera_one_off_mismatch_count=" & $chimera.oneOffMismatchCount)
+    f.writeLine("bimera_one_off_indel_count=" & $chimera.oneOffIndelCount)
+    f.writeLine("bimera_total_count=" & $(chimera.exactCount + chimera.oneOffMismatchCount + chimera.oneOffIndelCount))
+    f.writeLine("bimera_options=" & chimera.bimeraOptions)
+    f.writeLine("bimera_consensus_options=" & chimera.consensusOptions)
   f.writeLine("learn_options=" & learnOpts.describe())
   f.writeLine("learn_self_consist_options=" & learnScOpts.describe())
   f.writeLine("dada_self_consist_options=" & dadaScOpts.describe())
@@ -223,9 +367,11 @@ proc writePairedSummary(
   reverseDadaScRes: DadaSelfConsistResult,
   dadaOpts: DadaOptions,
   mergeRes: MergePairsResult,
+  outputMergedCount: int,
   mergeOpts: MergePairsOptions,
   forwardLoadedFromFile: bool,
-  reverseLoadedFromFile: bool
+  reverseLoadedFromFile: bool,
+  chimera: ChimeraStageSummary
 ) =
   var f: File
   if not open(f, path, fmWrite):
@@ -256,15 +402,29 @@ proc writePairedSummary(
   f.writeLine("reverse_asv_count=" & $dadaReverse.asvCount)
   f.writeLine("forward_corrected_uniques=" & $dadaForward.correctedUniques)
   f.writeLine("reverse_corrected_uniques=" & $dadaReverse.correctedUniques)
-  f.writeLine("merged_count=" & $mergeRes.merged.len)
+  f.writeLine("merged_count_pre_bimera=" & $mergeRes.merged.len)
+  f.writeLine("merged_count=" & $outputMergedCount)
   f.writeLine("merged_pairs=" & $mergeRes.stats.mergedPairs)
   f.writeLine("merge_candidate_pairs=" & $mergeRes.stats.candidatePairs)
   f.writeLine("merge_rejected_pairs=" & $mergeRes.stats.rejectedPairs)
   f.writeLine("merge_unsynchronized_reads=" & $mergeRes.stats.unsynchronizedReads)
   f.writeLine("merge_unique_asv_pairs=" & $mergeRes.stats.uniqueAsvPairs)
-  f.writeLine("merge_unique_sequences=" & $mergeRes.stats.uniqueMergedSequences)
+  f.writeLine("merge_unique_sequences_pre_bimera=" & $mergeRes.stats.uniqueMergedSequences)
+  f.writeLine("merge_unique_sequences=" & $outputMergedCount)
   for reason in MergeRejectReason:
     f.writeLine(&"merge_reject_{reason}={mergeRes.stats.rejectedByReason[reason]}")
+  f.writeLine("bimera_enabled=" & $chimera.enabled)
+  if chimera.enabled:
+    f.writeLine("bimera_mode=" & $chimera.mode)
+    f.writeLine("bimera_input_unique_sequences=" & $chimera.inputUnique)
+    f.writeLine("bimera_output_unique_sequences=" & $chimera.outputUnique)
+    f.writeLine("bimera_removed_unique_sequences=" & $chimera.removedUnique)
+    f.writeLine("bimera_exact_count=" & $chimera.exactCount)
+    f.writeLine("bimera_one_off_mismatch_count=" & $chimera.oneOffMismatchCount)
+    f.writeLine("bimera_one_off_indel_count=" & $chimera.oneOffIndelCount)
+    f.writeLine("bimera_total_count=" & $(chimera.exactCount + chimera.oneOffMismatchCount + chimera.oneOffIndelCount))
+    f.writeLine("bimera_options=" & chimera.bimeraOptions)
+    f.writeLine("bimera_consensus_options=" & chimera.consensusOptions)
   f.writeLine("learn_forward_reads_used=" & $learnBatchForward.readsUsed)
   f.writeLine("learn_reverse_reads_used=" & $learnBatchReverse.readsUsed)
   f.writeLine("learn_options=" & learnOpts.describe())
@@ -282,8 +442,10 @@ proc printSingleSummary(
   dadaScRan: bool,
   dadaScRes: DadaSelfConsistResult,
   dadaRes: DadaResult,
+  outputAsvCount: int,
   dadaOpts: DadaOptions,
-  loadedFromFile: bool
+  loadedFromFile: bool,
+  chimera: ChimeraStageSummary
 ) =
   echo "Mode: single-end denoising"
   echo &"Input reads: {derepRes.totalReads}"
@@ -291,8 +453,10 @@ proc printSingleSummary(
   echo &"Error model loaded from file: {loadedFromFile}"
   echo &"learnErrors iterations: {learnBatch.iterationsRun} converged={learnBatch.converged}"
   echo &"dada self-consistency enabled={dadaScOpts.enabled} ran={dadaScRan} iterations={dadaScRes.iterationsRun} converged={dadaScRes.converged}"
-  echo &"ASV count: {dadaRes.asvCount}"
+  echo &"ASV count: {outputAsvCount}"
   echo &"Corrected uniques: {dadaRes.correctedUniques} uncorrected uniques: {dadaRes.uncorrectedUniques}"
+  if chimera.enabled:
+    echo &"Bimera removal: mode={chimera.mode} removed={chimera.removedUnique} output={chimera.outputUnique} exact={chimera.exactCount} one_off_mismatch={chimera.oneOffMismatchCount} one_off_indel={chimera.oneOffIndelCount}"
   echo &"learnErrors options: {learnOpts.describe()}"
   echo &"learnErrors self-consistency options: {learnScOpts.describe()}"
   echo &"dada self-consistency options: {dadaScOpts.describe()}"
@@ -304,9 +468,11 @@ proc printPairedSummary(
   dadaForward: DadaResult,
   dadaReverse: DadaResult,
   mergeRes: MergePairsResult,
+  outputMergedCount: int,
   mergeOpts: MergePairsOptions,
   forwardLoadedFromFile: bool,
-  reverseLoadedFromFile: bool
+  reverseLoadedFromFile: bool,
+  chimera: ChimeraStageSummary
 ) =
   echo "Mode: paired-end denoising + mergePairs"
   echo &"Forward reads: {derepForward.totalReads} unique={derepForward.uniqueCount}"
@@ -314,8 +480,10 @@ proc printPairedSummary(
   echo &"Forward error matrix from file: {forwardLoadedFromFile}"
   echo &"Reverse error matrix from file: {reverseLoadedFromFile}"
   echo &"Forward ASVs: {dadaForward.asvCount} reverse ASVs: {dadaReverse.asvCount}"
-  echo &"Merged sequences: {mergeRes.merged.len}"
+  echo &"Merged sequences: {outputMergedCount}"
   echo &"Merged pairs: {mergeRes.stats.mergedPairs} rejected: {mergeRes.stats.rejectedPairs} candidate: {mergeRes.stats.candidatePairs}"
+  if chimera.enabled:
+    echo &"Bimera removal: mode={chimera.mode} removed={chimera.removedUnique} output={chimera.outputUnique} exact={chimera.exactCount} one_off_mismatch={chimera.oneOffMismatchCount} one_off_indel={chimera.oneOffIndelCount}"
   echo &"mergePairs options: {mergeOpts.describe()}"
 
 proc defaultPairedErrOut(basePath: string; suffix: string): string =
@@ -349,6 +517,13 @@ proc main() =
   var dadaOpts = defaultDadaOptions()
   var dadaScOpts = defaultDadaSelfConsistOptions()
   var mergeOpts = defaultMergePairsOptions()
+  var removeBimera = false
+  var bimeraMode = bmConsensus
+  var bimeraSampleId = ""
+  var bimeraOpts = defaultBimeraOptions()
+  var bimeraConsensusOpts = defaultBimeraConsensusOptions()
+  var bimeraMinFoldSet = false
+  var bimeraMinParentSet = false
 
   var parser = initOptParser(normalizeArgs(commandLineParams()))
 
@@ -462,6 +637,38 @@ proc main() =
           mergeOpts.threads = parseIntFlag(flag, value)
         of "merge-parallel-min-pairs":
           mergeOpts.parallelMinPairs = parseIntFlag(flag, value)
+        of "remove-bimera":
+          removeBimera = true
+        of "bimera-method":
+          case value.toLowerAscii()
+          of "pooled":
+            bimeraMode = bmPooled
+          of "consensus":
+            bimeraMode = bmConsensus
+          of "per-sample", "per_sample", "persample":
+            bimeraMode = bmPerSample
+          else:
+            fail("Invalid value for --bimera-method: " & value)
+        of "bimera-sample-id":
+          bimeraSampleId = value
+        of "bimera-min-fold-parent-over-abundance":
+          bimeraOpts.minFoldParentOverAbundance = parseFloatFlag(flag, value)
+          bimeraMinFoldSet = true
+        of "bimera-min-parent-abundance":
+          bimeraOpts.minParentAbundance = parseIntFlag(flag, value).int64
+          bimeraMinParentSet = true
+        of "bimera-allow-one-off":
+          bimeraOpts.allowOneOff = true
+        of "bimera-min-one-off-parent-distance":
+          bimeraOpts.minOneOffParentDistance = parseIntFlag(flag, value)
+        of "bimera-min-sample-fraction":
+          bimeraConsensusOpts.minSampleFraction = parseFloatFlag(flag, value)
+        of "bimera-ignore-n-negatives":
+          bimeraConsensusOpts.ignoreNNegatives = parseIntFlag(flag, value)
+        of "bimera-threads":
+          bimeraOpts.threads = parseIntFlag(flag, value)
+        of "bimera-parallel-min-candidates":
+          bimeraOpts.parallelMinCandidates = parseIntFlag(flag, value)
         of "verbose":
           verbose = true
         of "quiet":
@@ -497,6 +704,19 @@ proc main() =
     validateOptions(dadaOpts)
     validateOptions(dadaScOpts)
     validateOptions(mergeOpts)
+    if removeBimera:
+      if bimeraMode == bmPooled:
+        if not bimeraMinFoldSet:
+          bimeraOpts.minFoldParentOverAbundance = 2.0
+        if not bimeraMinParentSet:
+          bimeraOpts.minParentAbundance = 8
+      else:
+        if not bimeraMinFoldSet:
+          bimeraOpts.minFoldParentOverAbundance = 1.5
+        if not bimeraMinParentSet:
+          bimeraOpts.minParentAbundance = 2
+    validateOptions(bimeraOpts)
+    validateOptions(bimeraConsensusOpts)
 
     if pairedMode:
       var derepForwardOpts = derepOpts
@@ -609,9 +829,29 @@ proc main() =
         opts = mergeOpts
       )
 
+      var mergedOutput = merged.merged
+      var chimeraSummary = ChimeraStageSummary(enabled: false, mode: bimeraMode)
+      if removeBimera:
+        var sampleId =
+          if bimeraSampleId.len > 0: bimeraSampleId
+          else: deriveSampleIdFromForward(inputForward)
+        if sampleId.len == 0:
+          sampleId = defaultSampleIdFromPath(inputForward)
+        if verbose:
+          echo &"[dada2] Removing bimeras from merged output: mode={bimeraMode} sample={sampleId}"
+        let chim = filterMergedByBimera(
+          mergedRows = merged.merged,
+          sampleId = sampleId,
+          mode = bimeraMode,
+          bimeraOpts = bimeraOpts,
+          consensusOpts = bimeraConsensusOpts
+        )
+        mergedOutput = chim.rows
+        chimeraSummary = chim.summary
+
       if verbose:
         echo &"[dada2] Writing merged output: {outPath}"
-      writeMergedTsv(outPath, merged)
+      writeMergedRowsTsv(outPath, mergedOutput)
 
       if summaryPath.len > 0:
         writePairedSummary(
@@ -633,9 +873,11 @@ proc main() =
           reverseDadaScRes = reverseDadaScRes,
           dadaOpts = dadaOpts,
           mergeRes = merged,
+          outputMergedCount = mergedOutput.len,
           mergeOpts = mergeOpts,
           forwardLoadedFromFile = forwardErr.loadedFromFile,
-          reverseLoadedFromFile = reverseErr.loadedFromFile
+          reverseLoadedFromFile = reverseErr.loadedFromFile,
+          chimera = chimeraSummary
         )
 
       if not quiet:
@@ -645,9 +887,11 @@ proc main() =
           dadaForward = dadaForward,
           dadaReverse = dadaReverse,
           mergeRes = merged,
+          outputMergedCount = mergedOutput.len,
           mergeOpts = mergeOpts,
           forwardLoadedFromFile = forwardErr.loadedFromFile,
-          reverseLoadedFromFile = reverseErr.loadedFromFile
+          reverseLoadedFromFile = reverseErr.loadedFromFile,
+          chimera = chimeraSummary
         )
     else:
       var singleDerepOpts = derepOpts
@@ -694,9 +938,27 @@ proc main() =
           echo "[dada2] Running denoising"
         dadaRes = dadaDenoise(derepRes, finalErrMatrix, dadaOpts)
 
+      var outputAsvs = dadaRes.asvs
+      var chimeraSummary = ChimeraStageSummary(enabled: false, mode: bimeraMode)
+      if removeBimera:
+        var sampleId =
+          if bimeraSampleId.len > 0: bimeraSampleId
+          else: defaultSampleIdFromPath(inputPath)
+        if verbose:
+          echo &"[dada2] Removing bimeras from ASV output: mode={bimeraMode} sample={sampleId}"
+        let chim = filterAsvsByBimera(
+          asvs = dadaRes.asvs,
+          sampleId = sampleId,
+          mode = bimeraMode,
+          bimeraOpts = bimeraOpts,
+          consensusOpts = bimeraConsensusOpts
+        )
+        outputAsvs = chim.asvs
+        chimeraSummary = chim.summary
+
       if verbose:
         echo &"[dada2] Writing ASV table: {outPath}"
-      writeAsvTsv(outPath, dadaRes)
+      writeAsvRowsTsv(outPath, outputAsvs)
 
       if summaryPath.len > 0:
         writeSingleSummary(
@@ -710,8 +972,10 @@ proc main() =
           dadaScRan = dadaScRan,
           dadaScRes = dadaScRes,
           dadaRes = dadaRes,
+          outputAsvCount = outputAsvs.len,
           dadaOpts = dadaOpts,
-          loadedFromFile = err.loadedFromFile
+          loadedFromFile = err.loadedFromFile,
+          chimera = chimeraSummary
         )
 
       if not quiet:
@@ -724,8 +988,10 @@ proc main() =
           dadaScRan = dadaScRan,
           dadaScRes = dadaScRes,
           dadaRes = dadaRes,
+          outputAsvCount = outputAsvs.len,
           dadaOpts = dadaOpts,
-          loadedFromFile = err.loadedFromFile
+          loadedFromFile = err.loadedFromFile,
+          chimera = chimeraSummary
         )
   except CatchableError as e:
     fail(e.msg)

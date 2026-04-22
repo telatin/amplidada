@@ -111,7 +111,6 @@ proc tryMergePair(
   var bestOverlap = -1
   var bestMismatch = high(int)
   var sawTooManyMismatch = false
-  var sawOverhang = false
   var sawOverlap = false
 
   let minOffset = -lenR + opts.minOverlap
@@ -137,11 +136,6 @@ proc tryMergePair(
       sawTooManyMismatch = true
       continue
 
-    let overhang = (offset < 0) or (offset + lenR > lenF)
-    if overhang and not opts.trimOverhang:
-      sawOverhang = true
-      continue
-
     if (not found) or (ovLen > bestOverlap) or
        (ovLen == bestOverlap and mismatches < bestMismatch) or
        (ovLen == bestOverlap and mismatches == bestMismatch and offset < bestOffset):
@@ -151,9 +145,7 @@ proc tryMergePair(
       bestMismatch = mismatches
 
   if not found:
-    if sawOverhang:
-      reason = mrrOverhangDisallowed
-    elif sawTooManyMismatch:
+    if sawTooManyMismatch:
       reason = mrrTooManyMismatches
     elif sawOverlap:
       reason = mrrNoAlignment
@@ -161,8 +153,11 @@ proc tryMergePair(
       reason = mrrNoAlignment
     return false
 
-  let mergedStart = min(0, bestOffset)
-  let mergedEnd = max(lenF, bestOffset + lenR)
+  # trimOverhang=FALSE (default, matching R DADA2): include tails from both reads
+  # in the merged output — the full amplicon sequence.
+  # trimOverhang=TRUE: clip the merged sequence to the forward read's span only.
+  let mergedStart = if opts.trimOverhang: 0           else: min(0, bestOffset)
+  let mergedEnd   = if opts.trimOverhang: lenF         else: max(lenF, bestOffset + lenR)
   var merged = newStringOfCap(mergedEnd - mergedStart)
   for pos in mergedStart..<mergedEnd:
     let hasF = pos >= 0 and pos < lenF
