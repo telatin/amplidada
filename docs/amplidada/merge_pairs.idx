@@ -14,5 +14,5 @@ nim	defaultMergePairsOptions	amplidada/merge_pairs.html#defaultMergePairsOptions
 nim	validateOptions	amplidada/merge_pairs.html#validateOptions,MergePairsOptions	proc validateOptions(opts: MergePairsOptions)		62
 nim	describe	amplidada/merge_pairs.html#describe,MergePairsOptions	proc describe(opts: MergePairsOptions): string		72
 nim	reverseComplement	amplidada/merge_pairs.html#reverseComplement,string	proc reverseComplement(sequence: string): string		77
-nim	mergePairs	amplidada/merge_pairs.html#mergePairs,DerepFastqResult,DerepFastqResult,DadaResult,DadaResult,MergePairsOptions	proc mergePairs(derepForward: DerepFastqResult; derepReverse: DerepFastqResult;\n           dadaForward: DadaResult; dadaReverse: DadaResult;\n           opts: MergePairsOptions = defaultMergePairsOptions()): MergePairsResult		218
-nim	writeMergedTsv	amplidada/merge_pairs.html#writeMergedTsv,string,MergePairsResult	proc writeMergedTsv(path: string; res: MergePairsResult)		344
+nim	mergePairs	amplidada/merge_pairs.html#mergePairs,DerepFastqResult,DerepFastqResult,DadaResult,DadaResult,MergePairsOptions	proc mergePairs(derepForward: DerepFastqResult; derepReverse: DerepFastqResult;\n           dadaForward: DadaResult; dadaReverse: DadaResult;\n           opts: MergePairsOptions = defaultMergePairsOptions()): MergePairsResult		213
+nim	writeMergedTsv	amplidada/merge_pairs.html#writeMergedTsv,string,MergePairsResult	proc writeMergedTsv(path: string; res: MergePairsResult)		339

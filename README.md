@@ -1,7 +1,17 @@
 # amplidada
 
+![Amplidada](docs/amplidada.png)
+
 Port in Nim of part of [DADA2](https://benjjneb.github.io/dada2/)
 features.
+
+A library and a set of CLI tools:
+* dada2
+* derepFastq
+* fastqFilter
+* filterAndTrim
+* learnErrors
+* removeBimerDenovo
 
 
 ## Credits
