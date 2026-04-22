@@ -211,3 +211,44 @@ suite "mergePairs":
     check summary.contains("reverse_dada_self_consist_ran=true")
     check summary.contains("forward_dada_self_consist_iterations=")
     check summary.contains("reverse_dada_self_consist_iterations=")
+
+  test "dada2 CLI paired mode supports remove-bimera flags":
+    let dir = mpMakeTempDir("amplidada-merge-cli-bimera")
+    let fwd = dir / "R1.fastq"
+    let rev = dir / "R2.fastq"
+    let errPath = dir / "err.tsv"
+    let outPath = dir / "merged.tsv"
+    let summaryPath = dir / "summary.txt"
+    let binPath = dir / "dada2"
+
+    mpWriteFastq(fwd, @[
+      ("r1", "ACGTTGCA", "IIIIIIII"),
+      ("r2", "ACGTTGCA", "IIIIIIII"),
+      ("r3", "ACGTTGCA", "IIIIIIII")
+    ])
+    mpWriteFastq(rev, @[
+      ("r1", "TGCAACGT", "IIIIIIII"),
+      ("r2", "TGCAACGT", "IIIIIIII"),
+      ("r3", "TGCAACGT", "IIIIIIII")
+    ])
+
+    writeLearnErrorsTsv(errPath, mpMakeErrMatrix(0.999, 0.000333333333))
+    mpCompileDadaCli("src/cli/dada2.nim", binPath)
+
+    let cmd = quoteShell(binPath) &
+      " --in-forward " & quoteShell(fwd) &
+      " --in-reverse " & quoteShell(rev) &
+      " --out " & quoteShell(outPath) &
+      " --summary " & quoteShell(summaryPath) &
+      " --err-matrix " & quoteShell(errPath) &
+      " --remove-bimera --bimera-method pooled --min-overlap 4 --max-mismatch 0 --min-abundance 1 --quiet"
+    let run = execCmdEx(cmd)
+    check run.exitCode == 0
+    check fileExists(outPath)
+    check fileExists(summaryPath)
+
+    let summary = readFile(summaryPath)
+    check summary.contains("bimera_enabled=true")
+    check summary.contains("bimera_mode=bmPooled")
+    check summary.contains("merged_count_pre_bimera=")
+    check summary.contains("merged_count=")

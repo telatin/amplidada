@@ -270,3 +270,41 @@ suite "dada denoising":
     check summary.contains("asv_count=2")
     check summary.contains("corrected_uniques=1")
     check summary.contains("uncorrected_uniques=1")
+
+  test "dada2 CLI supports remove-bimera flags in single-end mode":
+    let dir = makeDadaTempDir("amplidada-dada-cli-bimera")
+    let input = dir / "reads.fastq"
+    let matrixPath = dir / "err.tsv"
+    let outPath = dir / "asv.tsv"
+    let summaryPath = dir / "summary.txt"
+
+    var records: seq[DadaFastqRec] = @[]
+    for i in 0..<20:
+      records.add(("a" & $i, "AAAAACCCCC", "IIIIIIIIII"))
+    for i in 0..<18:
+      records.add(("b" & $i, "GGGGGTTTTT", "IIIIIIIIII"))
+    for i in 0..<8:
+      records.add(("c" & $i, "AAAAATTTTT", "IIIIIIIIII"))
+    writeDadaFastq(input, records)
+
+    writeLearnErrorsTsv(matrixPath, makeMatrix(0.999, 0.000333333333))
+
+    let binPath = dir / "dada2"
+    compileDadaCli("src/cli/dada2.nim", binPath)
+
+    let cmd = quoteShell(binPath) &
+      " --in " & quoteShell(input) &
+      " --out " & quoteShell(outPath) &
+      " --err-matrix " & quoteShell(matrixPath) &
+      " --summary " & quoteShell(summaryPath) &
+      " --min-abundance 2 --omega-a 0.01 --remove-bimera --bimera-method pooled --quiet"
+    let run = execCmdEx(cmd)
+    check run.exitCode == 0
+    check fileExists(outPath)
+    check fileExists(summaryPath)
+
+    let summary = readFile(summaryPath)
+    check summary.contains("bimera_enabled=true")
+    check summary.contains("bimera_mode=bmPooled")
+    check summary.contains("asv_count_pre_bimera=")
+    check summary.contains("asv_count=")
