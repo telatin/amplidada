@@ -2,3 +2,5 @@ dada2/
 .nimcache*/
 results_asv/
 plots/
+tmp/
+.Rhistory
