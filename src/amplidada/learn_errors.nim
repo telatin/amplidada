@@ -74,7 +74,7 @@ proc defaultLearnErrorsSelfConsistOptions*(): LearnErrorsSelfConsistOptions =
     minIterations: 1,
     maxIterations: 8,
     tol: 1e-8,
-    maxCentersPerLength: 64
+    maxCentersPerLength: 500
   )
 
 proc validateOptions*(opts: LearnErrorsOptions) =
@@ -348,6 +348,21 @@ proc buildCandidatePools(
       candidates.setLen(maxCentersPerLength)
     result[seqLen] = candidates
 
+proc topCentersByLength(candidatePools: Table[int, seq[CenterCandidate]]): Table[int, string] =
+  result = initTable[int, string]()
+  for seqLen, candidates in candidatePools:
+    if candidates.len > 0:
+      result[seqLen] = candidates[0].sequence
+
+proc singleCentersToSeq(centers: Table[int, string]): seq[tuple[seqLen: int, center: string]] =
+  for seqLen, c in centers:
+    result.add((seqLen: seqLen, center: c))
+  result.sort(proc(a, b: tuple[seqLen: int, center: string]): int =
+    if a.seqLen != b.seqLen:
+      return cmp(a.seqLen, b.seqLen)
+    cmp(a.center, b.center)
+  )
+
 proc hammingDistance(a, b: string): int =
   let n = min(a.len, b.len)
   for i in 0..<n:
@@ -558,8 +573,9 @@ proc learnErrorsFromDereps*(
 ): LearnErrorsResult =
   validateOptions(opts)
   let uniqueObs = collectUniqueObs(derepResults)
-  let multiCenters = initialMultiCentersByLength(uniqueObs, 64)
-  accumulateFromMultiCenters(uniqueObs, multiCenters, opts)
+  let pools = buildCandidatePools(uniqueObs, 1)
+  let centers = topCentersByLength(pools)
+  accumulateFromCenters(uniqueObs, centers, opts)
 
 proc learnErrorsFromDerep*(
   derepRes: DerepFastqResult,
@@ -576,30 +592,30 @@ proc learnErrorsSelfConsistentFromDereps*(
   validateOptions(scOpts)
 
   let uniqueObs = collectUniqueObs(derepResults)
-  # Use top-K centers per length group; nearest-neighbor Hamming assignment
-  # correctly attributes reads to their most likely biological sequence,
-  # preventing biological diversity from inflating error rates.
-  let multiCenters = initialMultiCentersByLength(uniqueObs, scOpts.maxCentersPerLength)
+  let candidatePools = buildCandidatePools(uniqueObs, scOpts.maxCentersPerLength)
+  let lengthGroups = buildLengthGroups(uniqueObs)
 
   if not scOpts.enabled:
-    result.matrix = accumulateFromMultiCenters(uniqueObs, multiCenters, learnOpts)
+    let initialCenters = topCentersByLength(candidatePools)
+    result.matrix = accumulateFromCenters(uniqueObs, initialCenters, learnOpts)
     result.iterationsRun = (if uniqueObs.len == 0: 0 else: 1)
     result.converged = true
     result.maxAbsProbDelta = 0.0
-    result.centersByLength = multiCentersToSeq(multiCenters)
+    result.centersByLength = singleCentersToSeq(initialCenters)
     return
 
-  # Self-consistency: iteration 1 uses Hamming assignment for a good initial
-  # model; subsequent iterations refine via likelihood-based assignment.
   var previousMatrix = initResult(learnOpts.qMin, learnOpts.qMax)
   var havePrevious = false
+  var currentCenters = initTable[int, string]()
 
   for iter in 1..scOpts.maxIterations:
-    let currentMatrix =
+    currentCenters =
       if iter == 1:
-        accumulateFromMultiCenters(uniqueObs, multiCenters, learnOpts)
+        topCentersByLength(candidatePools)
       else:
-        accumulateFromMultiCentersLikelihood(uniqueObs, multiCenters, previousMatrix, learnOpts)
+        selectCentersByLikelihood(uniqueObs, lengthGroups, candidatePools, previousMatrix)
+
+    let currentMatrix = accumulateFromCenters(uniqueObs, currentCenters, learnOpts)
 
     var delta = 0.0
     if havePrevious:
@@ -619,7 +635,7 @@ proc learnErrorsSelfConsistentFromDereps*(
     previousMatrix = currentMatrix
     havePrevious = true
 
-  result.centersByLength = multiCentersToSeq(multiCenters)
+  result.centersByLength = singleCentersToSeq(currentCenters)
 
 proc learnErrorsFromFastqPaths*(
   inputPaths: openArray[string],

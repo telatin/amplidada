@@ -154,14 +154,29 @@ proc poissonTailAtLeast(k: int64, lambda: float64): float64 =
 
   let kk = int(k)
   if kk <= 512 and lambda <= 700:
-    var term = exp(-lambda)  # P(X=0)
-    var cdf = term           # P(X<=0)
-    for i in 1..<kk:
-      term *= lambda / i.float64
-      cdf += term
-      if term == 0.0:
-        break
-    return min(1.0, max(0.0, 1.0 - cdf))
+    if lambda < float64(kk):
+      # Direct sum P(X=k) + P(X=k+1) + ... avoids catastrophic cancellation
+      # in 1 - CDF when lambda is small relative to k.
+      let logBase = -lambda + float64(kk) * ln(lambda) - lgamma(float64(kk) + 1.0)
+      if logBase < -740.0:
+        return 0.0
+      var term = exp(logBase)
+      var total = term
+      for j in kk + 1..kk + 300:
+        term *= lambda / float64(j)
+        total += term
+        if term < total * 1e-15:
+          break
+      return min(1.0, max(0.0, total))
+    else:
+      var term = exp(-lambda)  # P(X=0)
+      var cdf = term
+      for i in 1..<kk:
+        term *= lambda / float64(i)
+        cdf += term
+        if term == 0.0:
+          break
+      return min(1.0, max(0.0, 1.0 - cdf))
 
   let z = (k.float64 - 0.5 - lambda) / sqrt(lambda)
   let tail = 0.5 * erfc(z / sqrt(2.0))
@@ -362,8 +377,13 @@ proc denoiseLengthGroup(
       if hd < opts.minHamming:
         continue
 
-      let lam = lambdaCenterToObs(centerLocal, localIdx, localToGlobal, uniques, err, opts.useQuality, cache)
-      let expected = lam * totals[cIdx].float64
+      # Sum expected abundance over ALL current clusters (R DADA2 semantics):
+      # lambda = sum_j (cluster_total_j × P(obs | center_j))
+      var expected = 0.0
+      for cj in 0..<centers.len:
+        let lamJ = lambdaCenterToObs(centers[cj], localIdx, localToGlobal, uniques, err, opts.useQuality, cache)
+        expected += lamJ * totals[cj].float64
+
       if expected > 0.0 and obs.abundance.float64 < opts.minFold * expected:
         continue
 
@@ -604,16 +624,19 @@ proc dadaDenoise*(
       let globalIdx = gRes.localToGlobal[localIdx]
       let obs = derepRes.uniques[globalIdx]
 
-      let lam = lambdaCenterToObs(
-        centerLocal = centerLocal,
-        obsLocal = localIdx,
-        localToGlobal = gRes.localToGlobal,
-        uniques = derepRes.uniques,
-        err = err,
-        useQuality = opts.useQuality,
-        cache = correctionCache
-      )
-      let expected = lam * gRes.clusterTotals[cIdx].float64
+      # Sum expected abundance over ALL clusters (R DADA2 semantics)
+      var expected = 0.0
+      for cj in 0..<gRes.centers.len:
+        let lamJ = lambdaCenterToObs(
+          centerLocal = gRes.centers[cj],
+          obsLocal = localIdx,
+          localToGlobal = gRes.localToGlobal,
+          uniques = derepRes.uniques,
+          err = err,
+          useQuality = opts.useQuality,
+          cache = correctionCache
+        )
+        expected += lamJ * gRes.clusterTotals[cj].float64
       let pCorr = abundancePValue(obs.abundance, expected, prior = true)
 
       if pCorr >= opts.omegaC:

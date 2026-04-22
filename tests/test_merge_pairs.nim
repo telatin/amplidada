@@ -107,22 +107,25 @@ suite "mergePairs":
     let asvF = dadaDenoise(dF, err, mpDadaOpts())
     let asvR = dadaDenoise(dR, err, mpDadaOpts())
 
-    var strict = defaultMergePairsOptions()
-    strict.minOverlap = 4
-    strict.maxMismatch = 0
-    strict.trimOverhang = false
-    strict.threads = 1
+    # trimOverhang=false (R DADA2 default): include tails → full merged "GTTGCA"
+    var keepTails = defaultMergePairsOptions()
+    keepTails.minOverlap = 4
+    keepTails.maxMismatch = 0
+    keepTails.trimOverhang = false
+    keepTails.threads = 1
 
-    let reject = mergePairs(dF, dR, asvF, asvR, strict)
-    check reject.stats.mergedPairs == 0
-    check reject.stats.rejectedByReason[mrrOverhangDisallowed] == 2
+    let withTails = mergePairs(dF, dR, asvF, asvR, keepTails)
+    check withTails.stats.mergedPairs == 2
+    check withTails.merged.len == 1
+    check withTails.merged[0].sequence == "GTTGCA"
 
-    var permissive = strict
-    permissive.trimOverhang = true
-    let accept = mergePairs(dF, dR, asvF, asvR, permissive)
-    check accept.stats.mergedPairs == 2
-    check accept.merged.len == 1
-    check accept.merged[0].sequence == "GTTGCA"
+    # trimOverhang=true: clip to forward span → merged = "GTTG"
+    var trimOpts = keepTails
+    trimOpts.trimOverhang = true
+    let trimmed = mergePairs(dF, dR, asvF, asvR, trimOpts)
+    check trimmed.stats.mergedPairs == 2
+    check trimmed.merged.len == 1
+    check trimmed.merged[0].sequence == "GTTG"
 
   test "dada2 CLI paired mode runs and writes merged output":
     let dir = mpMakeTempDir("amplidada-merge-cli")
