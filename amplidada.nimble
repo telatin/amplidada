@@ -6,12 +6,13 @@ description   = "Nim library for DADA2 denoising."
 license       = "GPL-3.0"
 srcDir        = "src"
 binDir        = "bin"
-bin           = @[
+  bin = @[
   "cli/dada2=dada2",
   "cli/derepFastq=derepFastq",
   "cli/fastqFilter=fastqFilter",
   "cli/filterAndTrim=filterAndTrim",
   "cli/learnErrors=learnErrors",
+  "cli/makeSequenceTable=makeSequenceTable",
   "cli/removeBimerDenovo=removeBimerDenovo"
 ]
 
