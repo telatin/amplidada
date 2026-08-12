@@ -1,5 +1,5 @@
 import std/[algorithm, os, parseopt, sets, strformat, strutils]
-import amplidada
+import amplidada/[dada, derep, learn_errors, loess_errfun_mod4, merge_pairs, remove_bimera_denovo]
 
 proc usage() =
   echo "Usage:"
@@ -52,6 +52,9 @@ proc usage() =
   echo "  --dada-self-tol <float>          Convergence tolerance for canonical self-consistency"
   echo "  --dada-self-keep-omega-c         Keep configured omegaC during self-consistency iterations"
   echo "  --dada-self-no-final-denoise     Skip final denoise pass with latest learned errors"
+  echo ""
+  echo "Error model:"
+  echo "  --binned-quality-mode          Use loessErrfun_mod4 for binned quality scores"
   echo ""
   echo "Paired-end merge options:"
   echo "  --min-overlap <int>              Minimum overlap length"
@@ -257,7 +260,8 @@ proc learnOrLoadErrorMatrix(
   outPath: string,
   learnOpts: LearnErrorsOptions,
   learnScOpts: LearnErrorsSelfConsistOptions,
-  verbose: bool
+  verbose: bool,
+  binnedQualityMode: bool = false
 ): tuple[matrix: LearnErrorsResult, batch: LearnErrorsBatchResult, loadedFromFile: bool] =
   if matrixPath.len > 0:
     if verbose:
@@ -281,6 +285,12 @@ proc learnOrLoadErrorMatrix(
     result.batch.maxAbsProbDelta = scRes.maxAbsProbDelta
     result.batch.centerChangesTotal = scRes.centerChangesTotal
     result.loadedFromFile = false
+
+  # Apply loessErrfun_mod4 if requested
+  if binnedQualityMode and not result.loadedFromFile:
+    if verbose:
+      echo &"[dada2] Applying loessErrfun_mod4 to {label} error matrix"
+    applyMod4ToResult(result.matrix)
 
   if outPath.len > 0:
     if verbose:
@@ -524,6 +534,7 @@ proc main() =
   var bimeraConsensusOpts = defaultBimeraConsensusOptions()
   var bimeraMinFoldSet = false
   var bimeraMinParentSet = false
+  var binnedQualityMode = false
 
   var parser = initOptParser(normalizeArgs(commandLineParams()))
 
@@ -607,6 +618,8 @@ proc main() =
           dadaScOpts.forceOmegaCZero = false
         of "dada-self-no-final-denoise":
           dadaScOpts.finalDenoiseWithLatestErrors = false
+        of "binned-quality-mode":
+          binnedQualityMode = true
         of "omega-a":
           dadaOpts.omegaA = parseFloatFlag(flag, value)
         of "omega-c":
@@ -754,7 +767,8 @@ proc main() =
         outPath = forwardErrOut,
         learnOpts = learnOpts,
         learnScOpts = learnScOpts,
-        verbose = verbose
+        verbose = verbose,
+        binnedQualityMode = binnedQualityMode
       )
       let reverseErr = learnOrLoadErrorMatrix(
         label = "reverse",
@@ -763,7 +777,8 @@ proc main() =
         outPath = reverseErrOut,
         learnOpts = learnOpts,
         learnScOpts = learnScOpts,
-        verbose = verbose
+        verbose = verbose,
+        binnedQualityMode = binnedQualityMode
       )
 
       var forwardMatrix = forwardErr.matrix
@@ -908,7 +923,8 @@ proc main() =
         outPath = errOutPath,
         learnOpts = learnOpts,
         learnScOpts = learnScOpts,
-        verbose = verbose
+        verbose = verbose,
+        binnedQualityMode = binnedQualityMode
       )
 
       var finalErrMatrix = err.matrix

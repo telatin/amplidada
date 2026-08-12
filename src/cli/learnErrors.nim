@@ -29,6 +29,7 @@ proc usage() =
   echo "  --max-iter <int>              Maximum self-consistency iterations"
   echo "  --tol <float>                 Convergence tolerance for max prob delta"
   echo "  --max-centers-per-length <int> Candidate centers per length during refinement"
+  echo "  --binned-quality-mode          Use loessErrfun_mod4 for binned quality scores"
   echo ""
   echo "Derep options:"
   echo "  --threads <int>               Worker threads"
@@ -182,6 +183,7 @@ proc main() =
 
   var learnOpts = defaultLearnErrorsOptions()
   var scOpts = defaultLearnErrorsSelfConsistOptions()
+  var binnedQualityMode = false
 
   var parser = initOptParser(normalizeArgs(commandLineParams()))
 
@@ -247,6 +249,8 @@ proc main() =
           scOpts.tol = parseFloatFlag(flag, value)
         of "max-centers-per-length":
           scOpts.maxCentersPerLength = parseIntFlag(flag, value)
+        of "binned-quality-mode":
+          binnedQualityMode = true
         of "verbose":
           verbose = true
         of "quiet":
@@ -293,7 +297,13 @@ proc main() =
       nbases = nbases,
       selfConsistOpts = scOpts
     )
-    let learnRes = batchRes.matrix
+    var learnRes = batchRes.matrix
+
+    # Apply loessErrfun_mod4 if requested
+    if binnedQualityMode:
+      if verbose:
+        echo "[learnErrors] Applying loessErrfun_mod4 for binned quality scores"
+      applyMod4ToResult(learnRes)
 
     if verbose:
       echo &"[learnErrors] Used {batchRes.filesUsed} file(s), reads={batchRes.readsUsed}, bases={batchRes.basesUsed}"
