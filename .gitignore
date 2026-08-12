@@ -4,3 +4,5 @@ results_asv/
 plots/
 tmp/
 .Rhistory
+.DS_Store
+dada2-rs/
